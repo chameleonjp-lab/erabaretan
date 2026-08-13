@@ -238,21 +238,8 @@ P0では次を揃える。
 
 **8段階レビュー計画は完了。**
 
-次の作業は、実装実行計画V1の **P0-01「初期12種類のカード仕様」** である。
+**P0-01「初期12種類のカード仕様」は完了。**
 
-P0-01では各カードについて最低限、次を定義する。
+正本：[初期12種類カード仕様 V1](16_INITIAL_12_CARD_SPEC_V1.md)
 
-```text
-cardDefinitionId
-displayName
-role
-worldImpactType
-playModes
-responseModes
-targetRule
-conditions
-effects
-copiesInDeck
-```
-
-P0-01完了後、P0-02「最初の世界律・ruleset検証値」、P0-03「Fixture仕様」へ進む。
+次の作業は、P0-02「最初の世界律とruleset検証値」である。P0-02完了後に、P0-03「Fixture A〜F、X01〜X14の仕様化」へ進む。

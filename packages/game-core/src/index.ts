@@ -5,3 +5,5 @@ export * from "./state/invariants.ts";
 export * from "./commands/types.ts";
 export * from "./commands/validate.ts";
 export * from "./reduce-command.ts";
+export * from "./effects/types.ts";
+export * from "./effects/resolve.ts";

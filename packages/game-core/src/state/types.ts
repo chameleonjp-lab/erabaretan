@@ -17,6 +17,35 @@ export type PlayMode = "RELEASE" | "RESTRAIN";
 export type ResponseMode = "RESPONSE";
 export type CardZone = "DRAW_PILE" | "HAND" | "DISCARD_PILE" | "REVEALED" | "RESOLUTION";
 
+export type ShieldScope = "CURRENT_PENDING_ATTACK" | "NEXT_APPLICABLE_ATTACK" | "UNTIL_TURN_SEQUENCE";
+
+export interface ShieldState {
+  readonly amount: number;
+  readonly scope: ShieldScope;
+  readonly pendingAttackId: string | null;
+  readonly expiresAfterTurnSequence: number | null;
+}
+
+export type StatModifierName = "INCOMING_DAMAGE_REDUCTION" | "ACTION_DAMAGE";
+
+export interface StatModifierState {
+  readonly stat: StatModifierName;
+  readonly delta: number;
+  readonly expiresAfterTurnSequence: number;
+}
+
+export type ScoreModifierKind =
+  | "WORLD_COLLAPSE_PENALTY"
+  | "SURVIVAL_BONUS"
+  | "WORLD_DAMAGE_RESPONSIBILITY"
+  | "EFFECTIVE_WORLD_RESTORE";
+
+export interface ScoreModifierState {
+  readonly playerId: PlayerId;
+  readonly modifierKind: ScoreModifierKind;
+  readonly amount: number;
+}
+
 export interface RulesetSnapshot {
   readonly rulesetId: string;
   readonly worldLawId: string;
@@ -56,6 +85,8 @@ export interface CardZones {
 export interface PlayerStatusEffects {
   readonly nextDefensePenalty: number;
   readonly fragileWorld: boolean;
+  readonly shields: readonly ShieldState[];
+  readonly statModifiers: readonly StatModifierState[];
 }
 
 export interface PlayerState {
@@ -109,6 +140,18 @@ export interface ResponseSelectionAction {
 }
 
 export type PendingAction = CardResolutionAction | ResponseSelectionAction;
+
+export interface PendingAttackState {
+  readonly pendingAttackId: string;
+  readonly attackingPlayerId: PlayerId;
+  readonly defendingPlayerId: PlayerId;
+  readonly baseDamage: number;
+  readonly responseCount: number;
+  readonly incomingDamageReduction: number;
+  readonly currentShield: number;
+  readonly effectiveDamage: number | null;
+  readonly reflectionApplied: boolean;
+}
 
 export interface TerminalFlags {
   readonly worldCollapsed: boolean;
@@ -205,7 +248,9 @@ export interface GameState {
   readonly world: WorldState;
   readonly activeField: ActiveFieldState | null;
   readonly pendingAction: PendingAction | null;
+  readonly pendingAttack: PendingAttackState | null;
   readonly effectQueue: readonly unknown[];
+  readonly scoreModifiers: readonly ScoreModifierState[];
   readonly terminalFlags: TerminalFlags;
   readonly judgment: JudgmentState | null;
   readonly randomConsumptionCount: number;

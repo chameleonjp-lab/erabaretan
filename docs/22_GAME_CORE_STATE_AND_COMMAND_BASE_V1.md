@@ -131,4 +131,4 @@ SURRENDER
 node --experimental-strip-types --test tests/game-core/state-command.test.mjs
 ```
 
-P1-01の完了条件を満たしたため、次はP1-02「effects / PAY_HP」へ進む。
+P1-01の完了条件を満たしたためP1-02「effects / PAY_HP」へ進み、効果命令と`PAY_HP`の実装を完了した。詳細は[P1-02実装記録](23_GAME_CORE_EFFECTS_PAY_HP_V1.md)を参照する。

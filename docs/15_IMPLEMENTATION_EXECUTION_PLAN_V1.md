@@ -232,9 +232,9 @@ reduce(state, validatedCommand, rng)
   -> nextState + events + randomConsumption
 ```
 
-### 4.0 P1-01の完了
+### 4.0 P1-01 / P1-02の完了
 
-[P1-01正本](22_GAME_CORE_STATE_AND_COMMAND_BASE_V1.md)として、GameState、7種類のcommand型、validation、revision、再送防止、RESOLUTION割り込み拒否、カードzoneを実装した。次はP1-02で効果キューと`PAY_HP`を追加する。
+[P1-01正本](22_GAME_CORE_STATE_AND_COMMAND_BASE_V1.md)として、GameState、7種類のcommand型、validation、revision、再送防止、RESOLUTION割り込み拒否、カードzoneを実装した。[P1-02正本](23_GAME_CORE_EFFECTS_PAY_HP_V1.md)として、16種類の効果命令、原子的な効果キュー、盾・反射・世界耐久の基礎処理、`PAY_HP`、初期12枚の効果ビルダーを追加した。次はP1-03で世界境界、フィールド自動効果、カード条件、終了判定、採点を追加する。
 
 ## 4.1 実装順
 
@@ -678,7 +678,7 @@ P0-05 決定的乱数・固定試験値
 P0-06 ゴールデン試合・状態ハッシュ
 
 P1-01 [state / command](22_GAME_CORE_STATE_AND_COMMAND_BASE_V1.md)
-P1-02 effects / PAY_HP
+P1-02 [effects / PAY_HP](23_GAME_CORE_EFFECTS_PAY_HP_V1.md)
 P1-03 thresholds / scoring
 P1-04 rng / replay / hash
 P1-05 projection / preview / summary
@@ -783,7 +783,7 @@ copiesInDeck
 
 **P0-06：ゴールデン試合3件と最終状態ハッシュを[正本](21_GOLDEN_MATCHES_AND_STATE_HASHES_V1.md)へ定義する。**
 
-P0完了判定後、P1-01からgame-core実装を開始した。P1-01完了後はP1-02へ進む。
+P0完了判定後、P1-01からgame-core実装を開始した。P1-01とP1-02が完了したため、P1-03へ進む。
 
 ---
 
@@ -802,4 +802,4 @@ P0完了判定後、P1-01からgame-core実装を開始した。P1-01完了後�
 
 以上をもって、企画レビューから実装計画への変換は完了とする。
 
-P1-01「純粋なstate / command基盤」は完了した。次のフェーズはP1-02「effects / PAY_HP」である。
+P1-01「純粋なstate / command基盤」とP1-02「effects / PAY_HP」は完了した。次のフェーズはP1-03「thresholds / scoring」である。

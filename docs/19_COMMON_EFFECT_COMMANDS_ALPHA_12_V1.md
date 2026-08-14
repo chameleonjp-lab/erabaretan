@@ -725,23 +725,23 @@ stateHash
 
 各カードは、次の共通命令だけで表す。
 
-| No. | カード | 使用方法 | 命令列 |
-|---:|---|---|---|
-| 01 | 堅実な一撃 | RELEASE | DAMAGE_PLAYER(6) |
-| 02 | 星砕き | RELEASE | DAMAGE_PLAYER(16) → DAMAGE_WORLD(7) |
-| 02 | 星砕き | RESTRAIN | ADD_SHIELD(3, NEXT_APPLICABLE_ATTACK) |
-| 03 | 裂け目の礫 | RELEASE | DAMAGE_PLAYER(4) → DAMAGE_WORLD(2) |
-| 03 | 裂け目の礫 | RESTRAIN | ADD_SHIELD(1, NEXT_APPLICABLE_ATTACK) |
-| 04 | 守りの帳 | RESPONSE | ADD_SHIELD(7, CURRENT_PENDING_ATTACK) |
-| 05 | 灰燼の城壁 | RESPONSE | ADD_SHIELD(12, CURRENT_PENDING_ATTACK) → DAMAGE_WORLD(4) |
-| 06 | 緑の取引 | RESPONSE | REDUCE_INCOMING_DAMAGE(3) → RESTORE_WORLD(4) |
-| 07 | 再生の誓約 | RELEASE | PAY_HP(4) → RESTORE_WORLD(7) |
-| 08 | 傷痕への審罰 | RELEASE | DAMAGE_PLAYER(8) |
-| 08 | 傷痕への審罰 | RESTRAIN | DAMAGE_PLAYER(3) |
-| 09 | 狂奔する亀裂 | RELEASE | SET_FIELD(frenzied-fracture, currentTurnSequence+3) |
-| 10 | 根守りの結界 | RELEASE | SET_FIELD(root-sanctuary, currentTurnSequence+3) |
-| 11 | 無色の宣告 | RELEASE | CLEAR_FIELD() → DAMAGE_WORLD(2) |
-| 12 | 静かな手直し | RELEASE | DISCARD_CARD(1) → DRAW_CARD(1) |
+| No. | cardDefinitionId | カード | 使用方法 | 命令列 |
+|---:|---|---|---|---|
+| 01 | attack.steadfast-strike.v1 | 堅実な一撃 | RELEASE | DAMAGE_PLAYER(6) |
+| 02 | attack.star-breaker.v1 | 星砕き | RELEASE | DAMAGE_PLAYER(16) → DAMAGE_WORLD(7) |
+| 02 | attack.star-breaker.v1 | 星砕き | RESTRAIN | ADD_SHIELD(3, NEXT_APPLICABLE_ATTACK) |
+| 03 | attack.rift-pebble.v1 | 裂け目の礫 | RELEASE | DAMAGE_PLAYER(4) → DAMAGE_WORLD(2) |
+| 03 | attack.rift-pebble.v1 | 裂け目の礫 | RESTRAIN | ADD_SHIELD(1, NEXT_APPLICABLE_ATTACK) |
+| 04 | defense.guardian-veil.v1 | 守りの帳 | RESPONSE | ADD_SHIELD(7, CURRENT_PENDING_ATTACK) |
+| 05 | defense.ashen-bulwark.v1 | 灰燼の城壁 | RESPONSE | ADD_SHIELD(12, CURRENT_PENDING_ATTACK) → DAMAGE_WORLD(4) |
+| 06 | intervention.verdant-bargain.v1 | 緑の取引 | RESPONSE | REDUCE_INCOMING_DAMAGE(3) → RESTORE_WORLD(4) |
+| 07 | intervention.oath-of-renewal.v1 | 再生の誓約 | RELEASE | PAY_HP(4) → RESTORE_WORLD(7) |
+| 08 | intervention.judgment-of-scars.v1 | 傷痕への審罰 | RELEASE | DAMAGE_PLAYER(8) |
+| 08 | intervention.judgment-of-scars.v1 | 傷痕への審罰 | RESTRAIN | DAMAGE_PLAYER(3) |
+| 09 | field.frenzied-fracture.v1 | 狂奔する亀裂 | RELEASE | SET_FIELD(frenzied-fracture, currentTurnSequence+3) |
+| 10 | field.root-sanctuary.v1 | 根守りの結界 | RELEASE | SET_FIELD(root-sanctuary, currentTurnSequence+3) |
+| 11 | intervention.field-nullification.v1 | 無色の宣告 | RELEASE | CLEAR_FIELD() → DAMAGE_WORLD(2) |
+| 12 | intervention.careful-redraw.v1 | 静かな手直し | RELEASE | DISCARD_CARD(1) → DRAW_CARD(1) |
 
 初期12種類では、次の命令をカードから直接発行しない。
 
@@ -770,4 +770,3 @@ ADD_SCORE_MODIFIER
 - [x] カード専用JavaScript処理、eval、new Function、クライアント効果値を禁止した。
 
 P0-04は完了とする。次はP0-05「決定的乱数生成器と固定試験値」へ進む。P0-05とP0-06が終わるまで、game-core本実装と画面実装は開始しない。
-

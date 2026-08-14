@@ -9,6 +9,7 @@
 - 関連文書：[ruleset alpha-12 と砕けゆく原初界 V1](17_RULESET_ALPHA_12_V1.md)
 - 関連文書：[alpha-12 Fixture仕様 V1](18_FIXTURES_ALPHA_12_V1.md)
 - 関連文書：[決定的乱数生成器と固定試験値 V1](20_DETERMINISTIC_RNG_AND_FIXED_VECTORS_V1.md)
+- 関連文書：[ゴールデン試合と最終状態ハッシュ V1](21_GOLDEN_MATCHES_AND_STATE_HASHES_V1.md)
 - 関連契約：[ルールエンジン契約](08_RULE_ENGINE_CONTRACT.md)
 
 ## 1. この文書の役割
@@ -770,4 +771,4 @@ ADD_SCORE_MODIFIER
 - [x] 初期12種類すべてを共通命令だけへ展開した。
 - [x] カード専用JavaScript処理、eval、new Function、クライアント効果値を禁止した。
 
-P0-04は完了とする。P0-05の決定的乱数と初期山札の固定値は、[決定的乱数正本](20_DETERMINISTIC_RNG_AND_FIXED_VECTORS_V1.md)で定義した。次はP0-06「ゴールデン試合3件と最終状態ハッシュ」へ進む。P0-06が終わるまで、game-core本実装と画面実装は開始しない。
+P0-04は完了とする。P0-05の決定的乱数と初期山札の固定値、P0-06のゴールデン試合と最終状態ハッシュは、それぞれの正本で定義した。次はP1-01「純粋なstate / command基盤」へ進む。

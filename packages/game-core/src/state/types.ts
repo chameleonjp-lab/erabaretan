@@ -130,6 +130,7 @@ export interface CardResolutionAction {
   readonly cardDefinitionId: CardDefinitionId;
   readonly playMode: PlayMode;
   readonly targetPlayerId: PlayerId | null;
+  readonly discardCardInstanceId?: CardInstanceId | null;
   readonly responseCardInstanceId: CardInstanceId | null;
   readonly responseMode: ResponseMode | "ACCEPT_DAMAGE" | null;
 }

@@ -33,7 +33,7 @@ function makeState(overrides = {}) {
     phase: "RESOLUTION",
     cardInstances: [
       card("p1-card-01", "attack.star-breaker.v1", "P1", "HAND", 1),
-      card("p2-card-01", "attack.rift-pebble.v1", "P2", "HAND", 2),
+      card("p2-card-01", "attack.star-breaker.v1", "P2", "HAND", 2),
       card("draw-01", "attack.steadfast-strike.v1", "P1", "DRAW_PILE", 3),
     ],
     drawPile: ["draw-01"],
@@ -128,6 +128,52 @@ test("fragile-world self damage consumes a normal persistent shield", () => {
   assert.equal(result.state.players.P1.hitPoints, 29);
   assert.deepEqual(result.state.players.P1.statusEffects.shields, []);
   assert.equal(result.results.length, 2);
+});
+
+test("fragile-world self damage for a response waits until the response card group ends", () => {
+  const state = makeState({
+    worldDurability: 25,
+    triggeredThresholds: [25],
+    players: [
+      { playerId: "P1", hand: ["p1-card-01"], hitPoints: 30, fragileWorld: true },
+      { playerId: "P2", hand: ["p2-card-01"], hitPoints: 30, fragileWorld: true },
+    ],
+  });
+  const result = resolveEffectQueue(state, [
+    effect("DAMAGE_WORLD", { targetKind: "WORLD" }, { amount: 1, reason: "CARD_RESPONSE" }, "effect.resolution-0304.0002", {
+      source: source("P1", "p1-card-01", "RESPONSE"),
+    }),
+    effect("DAMAGE_WORLD", { targetKind: "WORLD" }, { amount: 1, reason: "CARD_RESPONSE" }, "effect.resolution-0304.0003", {
+      source: source("P1", "p1-card-01", "RESPONSE"),
+    }),
+  ]);
+  assert.equal(result.committed, true);
+  assert.equal(result.state.world.durability, 23);
+  assert.equal(result.state.players.P1.hitPoints, 28);
+  assert.deepEqual(result.results.map((item) => item.commandType), ["DAMAGE_WORLD", "DAMAGE_WORLD", "DAMAGE_PLAYER"]);
+  assert.equal(result.results[0].spawnedEffectIds.length, 1);
+});
+
+test("field effects and generated reactions count toward the 32-effect budget", () => {
+  const fieldState = makeState({
+    activeField: {
+      fieldDefinitionId: "field.root-sanctuary.v1",
+      ownerPlayerId: "P2",
+      expiresAfterTurnSequence: 4,
+      lastFrenziedCardInstanceId: null,
+      rootSanctuaryUsedTurnSequence: null,
+    },
+  });
+  const effects = Array.from({ length: 32 }, (_, index) => effect(
+    "DAMAGE_WORLD",
+    { targetKind: "WORLD" },
+    { amount: 1, reason: "CARD_RELEASE" },
+    `effect.resolution-budget.${String(index + 1).padStart(4, "0")}`,
+  ));
+  const result = resolveEffectQueue(fieldState, effects);
+  assert.equal(result.committed, false);
+  assert.equal(result.rejectionCode, "EFFECT_QUEUE_LIMIT");
+  assert.equal(result.state.terminalFlags.endKind, "INVALID_MATCH");
 });
 
 test("frenzied fracture modifies one card once and root sanctuary modifies one turn once", () => {
@@ -257,4 +303,17 @@ test("simultaneous reflection and world collapse preserve both defeats", () => {
   assert.equal(result.state.terminalFlags.battleWinnerId, null);
   assert.deepEqual(result.state.judgment.playerScores, { P1: -113, P2: 2 });
   assert.equal(result.state.terminalFlags.divineSelectionWinnerId, "P2");
+});
+
+test("maximum-round terminal resolution starts after round maxRounds completes", () => {
+  const beforeFinalRound = resolveEffectQueue(makeState({ roundNumber: 10 }), []);
+  assert.equal(beforeFinalRound.committed, true);
+  assert.equal(beforeFinalRound.state.phase, "RESOLUTION");
+  assert.equal(beforeFinalRound.state.terminalFlags.maxRoundsReached, false);
+
+  const afterFinalRound = resolveEffectQueue(makeState({ roundNumber: 11 }), []);
+  assert.equal(afterFinalRound.committed, true);
+  assert.equal(afterFinalRound.state.phase, "FINISHED");
+  assert.equal(afterFinalRound.state.terminalFlags.maxRoundsReached, true);
+  assert.equal(afterFinalRound.state.terminalFlags.battleWinnerId, null);
 });

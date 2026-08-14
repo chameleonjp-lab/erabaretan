@@ -79,6 +79,7 @@ function moveToResolution(
     cardDefinitionId: card.cardDefinitionId,
     playMode: command.payload.playMode,
     targetPlayerId: command.payload.targetPlayerId ?? null,
+    discardCardInstanceId: command.payload.discardCardInstanceId ?? null,
     responseCardInstanceId: null,
     responseMode: null,
   };
@@ -225,6 +226,7 @@ function answerResponse(
     cardDefinitionId: pending.cardDefinitionId,
     playMode: pending.playMode,
     targetPlayerId: pending.targetPlayerId,
+    discardCardInstanceId: pending.discardCardInstanceId ?? null,
     responseCardInstanceId,
     responseMode,
   };

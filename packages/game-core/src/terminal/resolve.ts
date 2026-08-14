@@ -6,13 +6,10 @@ function hasCollapsePenalty(state: GameState, playerId: PlayerId): boolean {
   return state.scoreModifiers.some((modifier) => modifier.playerId === playerId && modifier.modifierKind === "WORLD_COLLAPSE_PENALTY");
 }
 
-function battleWinnerId(state: GameState, defeatedPlayerIds: readonly PlayerId[], terminalByMaxRounds: boolean): PlayerId | null {
+function battleWinnerId(state: GameState, defeatedPlayerIds: readonly PlayerId[]): PlayerId | null {
   const alive = state.initialPlayerOrder.filter((playerId) => !defeatedPlayerIds.includes(playerId));
   if (alive.length === 1) return alive[0];
-  if (!terminalByMaxRounds || alive.length !== 2) return null;
-  const [first, second] = alive;
-  if (state.players[first].hitPoints === state.players[second].hitPoints) return null;
-  return state.players[first].hitPoints > state.players[second].hitPoints ? first : second;
+  return null;
 }
 
 /**
@@ -25,7 +22,10 @@ export function finalizeTerminalState(state: GameState): GameState {
 
   const defeatedPlayerIds = state.initialPlayerOrder.filter((playerId) => state.players[playerId].hitPoints <= 0);
   const worldCollapsed = state.world.durability === 0 || state.terminalFlags.worldCollapsed;
-  const maxRoundsReached = state.roundNumber >= state.ruleset.maxRounds;
+  // roundNumber advances after both players complete a round. The value
+  // maxRounds + 1 therefore represents the first state after the final
+  // allowed round has completed.
+  const maxRoundsReached = state.roundNumber > state.ruleset.maxRounds;
   if (defeatedPlayerIds.length === 0 && !worldCollapsed && !maxRoundsReached) return state;
 
   let scoreModifiers = [...state.scoreModifiers];
@@ -45,7 +45,7 @@ export function finalizeTerminalState(state: GameState): GameState {
     defeatedPlayerIds,
     maxRoundsReached,
     endKind: "NORMAL",
-    battleWinnerId: battleWinnerId(state, defeatedPlayerIds, maxRoundsReached),
+    battleWinnerId: battleWinnerId(state, defeatedPlayerIds),
     divineSelectionWinnerId: null,
   };
   const preJudgment: GameState = {

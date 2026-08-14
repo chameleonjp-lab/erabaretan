@@ -44,6 +44,7 @@ export interface CardConditionValidationInput {
   readonly cardInstanceId: string;
   readonly mode: PlayMode | "RESPONSE";
   readonly targetPlayerId?: PlayerId | null;
+  readonly discardCardInstanceId?: string | null;
 }
 
 export interface CommandValidationOptions {
@@ -168,7 +169,7 @@ export function validateCommand(state: GameState, input: unknown, options: Comma
 
   const payload = input.payload;
   if (input.commandType === "PLAY_CARD") {
-    if (!isRecord(payload) || !hasOnlyKeys(payload, ["cardInstanceId", "playMode", "targetPlayerId"])) {
+    if (!isRecord(payload) || !hasOnlyKeys(payload, ["cardInstanceId", "playMode", "targetPlayerId", "discardCardInstanceId"])) {
       return rejection("INVALID_PAYLOAD", "PLAY_CARD payload has unexpected fields", input.commandId);
     }
     if (!isId(payload.cardInstanceId) || (payload.playMode !== "RELEASE" && payload.playMode !== "RESTRAIN")) {
@@ -176,6 +177,9 @@ export function validateCommand(state: GameState, input: unknown, options: Comma
     }
     if (payload.targetPlayerId !== undefined && !isPlayerId(state, payload.targetPlayerId)) {
       return rejection("INVALID_TARGET", "targetPlayerId is not in this match", input.commandId);
+    }
+    if (payload.discardCardInstanceId !== undefined && !isId(payload.discardCardInstanceId)) {
+      return rejection("INVALID_PAYLOAD", "discardCardInstanceId must be a stable identifier", input.commandId);
     }
     if (!state.cardInstances[payload.cardInstanceId]) {
       return rejection("UNKNOWN_CARD_INSTANCE", "cardInstanceId does not exist", input.commandId);
@@ -190,6 +194,7 @@ export function validateCommand(state: GameState, input: unknown, options: Comma
         cardInstanceId: payload.cardInstanceId,
         mode: payload.playMode,
         targetPlayerId: payload.targetPlayerId ?? null,
+        discardCardInstanceId: payload.discardCardInstanceId ?? null,
       });
       if (!condition.ok) return rejection(condition.code, condition.message, input.commandId);
     }

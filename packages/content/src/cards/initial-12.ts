@@ -1,6 +1,6 @@
 import type { EffectCommand, EffectCommandType, EffectPayload } from "../../../game-core/src/effects/types.ts";
 import type { CommandValidationOptions } from "../../../game-core/src/commands/validate.ts";
-import type { CardDefinitionId, GameState, PlayMode, PlayerId } from "../../../game-core/src/state/types.ts";
+import type { CardDefinitionId, CardInstanceId, GameState, PlayMode, PlayerId } from "../../../game-core/src/state/types.ts";
 
 type CardRole = "ATTACK" | "DEFENSE" | "INTERVENTION" | "FIELD";
 type WorldImpactType = "DAMAGE" | "NEUTRAL" | "RESTORE";
@@ -96,7 +96,7 @@ export const INITIAL_12_CARD_DEFINITIONS: readonly InitialCardDefinition[] = [
       RELEASE: [damagePlayer(16, "OPPONENT"), damageWorld(7)],
       RESTRAIN: [nextApplicableShield(3)],
     },
-    conditions: { RELEASE: actionTargetCondition, RESTRAIN: actionTargetCondition },
+    conditions: { RELEASE: actionTargetCondition, RESTRAIN: actionCondition },
   },
   {
     cardDefinitionId: "attack.rift-pebble.v1",
@@ -110,7 +110,7 @@ export const INITIAL_12_CARD_DEFINITIONS: readonly InitialCardDefinition[] = [
       RELEASE: [damagePlayer(4, "OPPONENT"), damageWorld(2)],
       RESTRAIN: [nextApplicableShield(1)],
     },
-    conditions: { RELEASE: actionTargetCondition, RESTRAIN: actionTargetCondition },
+    conditions: { RELEASE: actionTargetCondition, RESTRAIN: actionCondition },
   },
   {
     cardDefinitionId: "defense.guardian-veil.v1",
@@ -225,6 +225,8 @@ export interface BuildCardEffectsInput {
   readonly mode: PlayMode | "RESPONSE";
   readonly targetPlayerId?: PlayerId;
   readonly pendingAttackId?: string;
+  /** The hand card selected by careful-redraw; it must differ from cardInstanceId. */
+  readonly discardCardInstanceId?: CardInstanceId;
   readonly turnSequence: number;
 }
 
@@ -247,6 +249,16 @@ export function buildInitial12CardEffects(input: BuildCardEffectsInput): readonl
   if (!templates) throw new Error(`${input.cardDefinitionId} does not support mode ${input.mode}`);
   return templates.map((template, index) => {
     const payload: Record<string, unknown> = { ...template.payload };
+    if (template.commandType === "DISCARD_CARD") {
+      if (!input.discardCardInstanceId) {
+        throw new Error("discardCardInstanceId is required for careful-redraw");
+      }
+      if (input.discardCardInstanceId === input.cardInstanceId) throw new Error("discardCardInstanceId must differ from the card being resolved");
+      payload.selection = {
+        selectionKind: "EXPLICIT_CARD_INSTANCE",
+        cardInstanceId: input.discardCardInstanceId,
+      };
+    }
     if (template.commandType === "ADD_SHIELD" && payload.scope === "CURRENT_PENDING_ATTACK") payload.pendingAttackId = input.pendingAttackId;
     if (template.commandType === "ADD_SHIELD" && payload.scope === "NEXT_APPLICABLE_ATTACK") payload.expiresAfterTurnSequence = input.turnSequence + 2;
     if (template.commandType === "SET_FIELD") {
@@ -288,6 +300,7 @@ export interface ValidateInitial12CardPlayInput {
   readonly cardInstanceId: string;
   readonly mode: PlayMode | "RESPONSE";
   readonly targetPlayerId?: PlayerId | null;
+  readonly discardCardInstanceId?: CardInstanceId | null;
 }
 
 /**
@@ -317,11 +330,15 @@ export function validateInitial12CardPlay(input: ValidateInitial12CardPlayInput)
   }
   if (condition.requiresPendingAttackDefender) {
     const pending = input.state.pendingAction;
+    const pendingAttack = input.state.pendingAttack;
     if (
       !pending
       || pending.kind !== "RESPONSE_SELECTION"
       || pending.defendingPlayerId !== input.playerId
       || input.state.respondingPlayerId !== input.playerId
+      || !pendingAttack
+      || pending.pendingAttackId !== pendingAttack.pendingAttackId
+      || pending.defendingPlayerId !== pendingAttack.defendingPlayerId
     ) {
       return { ok: false, code: "CONDITION_NOT_MET", message: "the player is not the current pending-attack defender" };
     }
@@ -343,6 +360,16 @@ export function validateInitial12CardPlay(input: ValidateInitial12CardPlayInput)
   }
   if (condition.handSizeAtLeast !== undefined && self.hand.length < condition.handSizeAtLeast) {
     return { ok: false, code: "CONDITION_NOT_MET", message: "the hand is below the card condition" };
+  }
+  if (definition.cardDefinitionId === "intervention.careful-redraw.v1") {
+    if (
+      !input.discardCardInstanceId
+      || input.discardCardInstanceId === input.cardInstanceId
+      || !self.hand.includes(input.discardCardInstanceId)
+      || input.state.cardZones.inResolution.includes(input.discardCardInstanceId)
+    ) {
+      return { ok: false, code: "CONDITION_NOT_MET", message: "careful-redraw must discard another card from the player's hand" };
+    }
   }
   return { ok: true, definition };
 }

@@ -365,6 +365,7 @@ RESPONSE
 ```text
 DAMAGE_PLAYER
 HEAL_PLAYER
+PAY_HP
 ADD_SHIELD
 REDUCE_INCOMING_DAMAGE
 REFLECT_DAMAGE
@@ -381,6 +382,8 @@ ADD_SCORE_MODIFIER
 ```
 
 ### 8.1 共通原則
+
+共通効果命令の正式な入力型、結果型、責任、拒否条件は、[共通効果命令の正式型 V1](19_COMMON_EFFECT_COMMANDS_ALPHA_12_V1.md)を正本とする。
 
 - 効果命令は型で区別する。
 - 自由なJavaScript文字列をカードデータへ入れない。

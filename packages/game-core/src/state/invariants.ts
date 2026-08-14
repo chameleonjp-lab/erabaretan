@@ -151,10 +151,10 @@ export function assertGameState(state: GameState): void {
     if (state.activeField.expiresAfterTurnSequence <= state.turnSequence) {
       throw new Error("activeField has expired but is still present");
     }
-    if (state.activeField.rootSanctuaryUsedTurnSequence !== null) {
+    if (state.activeField.rootSanctuaryUsedTurnSequence !== null && state.activeField.rootSanctuaryUsedTurnSequence !== undefined) {
       assertIntegerInRange("activeField.rootSanctuaryUsedTurnSequence", state.activeField.rootSanctuaryUsedTurnSequence, 1, Number.MAX_SAFE_INTEGER);
     }
-    if (state.activeField.lastFrenziedCardInstanceId !== null && !state.cardInstances[state.activeField.lastFrenziedCardInstanceId]) {
+    if (state.activeField.lastFrenziedCardInstanceId !== null && state.activeField.lastFrenziedCardInstanceId !== undefined && !state.cardInstances[state.activeField.lastFrenziedCardInstanceId]) {
       throw new Error("activeField.lastFrenziedCardInstanceId is unknown");
     }
   }

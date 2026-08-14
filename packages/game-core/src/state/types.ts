@@ -116,9 +116,9 @@ export interface ActiveFieldState {
   readonly ownerPlayerId: PlayerId;
   readonly expiresAfterTurnSequence: number;
   /** The last card instance that received the frenzied-fracture +1 modifier. */
-  readonly lastFrenziedCardInstanceId: CardInstanceId | null;
+  readonly lastFrenziedCardInstanceId?: CardInstanceId | null;
   /** The turnSequence whose first world-damage request used root-sanctuary. */
-  readonly rootSanctuaryUsedTurnSequence: number | null;
+  readonly rootSanctuaryUsedTurnSequence?: number | null;
 }
 
 export interface CardResolutionAction {

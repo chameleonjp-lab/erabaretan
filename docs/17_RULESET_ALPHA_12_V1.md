@@ -7,8 +7,9 @@
 - 上位文書：[統合計画 V4](14_INTEGRATED_PLAN_V4.md)、[実装実行計画 V1](15_IMPLEMENTATION_EXECUTION_PLAN_V1.md)
 - 関連文書：[初期12種類カード仕様 V1](16_INITIAL_12_CARD_SPEC_V1.md)
 - 効果命令：[共通効果命令の正式型 V1](19_COMMON_EFFECT_COMMANDS_ALPHA_12_V1.md)
-- 決定的乱数：[決定的乱数生成器と固定試験値 V1](20_DETERMINISTIC_RNG_AND_FIXED_VECTORS_V1.md)
 - 後続検証：[alpha-12 Fixture仕様 V1](18_FIXTURES_ALPHA_12_V1.md)
+- 決定的乱数：[決定的乱数生成器と固定試験値 V1](20_DETERMINISTIC_RNG_AND_FIXED_VECTORS_V1.md)
+- 終端検証：[ゴールデン試合と最終状態ハッシュ V1](21_GOLDEN_MATCHES_AND_STATE_HASHES_V1.md)
 - 関連契約：[ルールエンジン契約](08_RULE_ENGINE_CONTRACT.md)
 
 ## 1. この文書の役割
@@ -365,4 +366,4 @@ RESTORE_WORLD：7
 - [x] Fixture A〜Fの初期状態・操作・期待結果をP0-03の正本へ定義した。
 - [x] 敵対的Fixture X01〜X14をP0-03の正本へ定義した。
 
-P0-02は完了とし、P0-03のFixture正本、P0-04の効果命令正本、P0-05の決定的乱数正本を追加した。次はP0-06「ゴールデン試合3件と最終状態ハッシュ」へ進む。P0-06が終わるまで、`game-core`本実装と画面実装は開始しない。
+P0-02は完了とし、P0-03のFixture正本、P0-04の効果命令正本、P0-05の決定的乱数正本、P0-06の終端検証正本を追加した。次はP1-01「純粋なstate / command基盤」へ進む。

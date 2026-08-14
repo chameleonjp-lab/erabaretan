@@ -66,6 +66,7 @@
 3. [alpha-12 Fixture仕様](18_FIXTURES_ALPHA_12_V1.md)
 4. [共通効果命令の正式型](19_COMMON_EFFECT_COMMANDS_ALPHA_12_V1.md)
 5. [決定的乱数生成器と固定試験値](20_DETERMINISTIC_RNG_AND_FIXED_VECTORS_V1.md)
+6. [ゴールデン試合と最終状態ハッシュ](21_GOLDEN_MATCHES_AND_STATE_HASHES_V1.md)
 
 状態遷移、補充順、手札上限、命令受理、効果、世界境界、終了、採点、リプレイ、不変条件の詳細を扱う。
 
@@ -252,6 +253,8 @@ P0では次を揃える。
 
 **P0-05「決定的乱数生成器と固定試験値」は完了。**
 
+**P0-06「ゴールデン試合と最終状態ハッシュ」は完了。**
+
 正本：
 
 - [初期12種類カード仕様 V1](16_INITIAL_12_CARD_SPEC_V1.md)
@@ -259,5 +262,6 @@ P0では次を揃える。
 - [alpha-12 Fixture仕様 V1](18_FIXTURES_ALPHA_12_V1.md)
 - [共通効果命令の正式型 V1](19_COMMON_EFFECT_COMMANDS_ALPHA_12_V1.md)
 - [決定的乱数生成器と固定試験値 V1](20_DETERMINISTIC_RNG_AND_FIXED_VECTORS_V1.md)
+- [ゴールデン試合と最終状態ハッシュ V1](21_GOLDEN_MATCHES_AND_STATE_HASHES_V1.md)
 
-次の作業は、P0-06「ゴールデン試合3件と最終状態ハッシュ」である。P0-06が終わるまで、`game-core`本実装と画面実装は開始しない。
+次の作業は、P1-01「純粋なstate / command基盤」である。P0-06が完了したため、P1-01の`game-core`基盤実装を開始できる。

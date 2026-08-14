@@ -5,6 +5,7 @@
 - 対象rulesetId：`ruleset.alpha-12.v1`
 - 対象catalogHash：初期12種類カードカタログのハッシュを実装時に設定する
 - 関連文書：[ルールエンジン契約](08_RULE_ENGINE_CONTRACT.md)、[初期12種類カード仕様](16_INITIAL_12_CARD_SPEC_V1.md)、[ruleset仕様](17_RULESET_ALPHA_12_V1.md)、[Fixture仕様](18_FIXTURES_ALPHA_12_V1.md)、[共通効果命令の正式型](19_COMMON_EFFECT_COMMANDS_ALPHA_12_V1.md)
+- 後続検証：[ゴールデン試合と最終状態ハッシュ V1](21_GOLDEN_MATCHES_AND_STATE_HASHES_V1.md)
 
 ## 1. この文書の役割
 
@@ -526,4 +527,4 @@ acceptedCommands
 - [x] リプレイ、再接続、版変更時の扱いを固定した。
 - [x] クライアント入力、重複命令、画面演出による乱数改変を禁止した。
 
-P0-05は完了とする。次はP0-06「ゴールデン試合3件と最終状態ハッシュ」へ進む。P0-06が終わるまで、`game-core`本実装と画面実装は開始しない。
+P0-05は完了とする。ゴールデン試合と最終状態ハッシュは、[P0-06正本](21_GOLDEN_MATCHES_AND_STATE_HASHES_V1.md)で固定した。次はP1-01「純粋なstate / command基盤」へ進む。

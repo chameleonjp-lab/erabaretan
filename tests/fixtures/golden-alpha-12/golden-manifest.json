@@ -1,0 +1,238 @@
+{
+  "formatVersion": "golden-alpha-12.manifest.v1",
+  "stateHashVersion": "state-hash.alpha-12.v1",
+  "cases": {
+    "g01": {
+      "harness": "production-command-pipeline",
+      "initialState": {
+        "source": "createAlpha12Setup",
+        "matchId": "golden-g01-normal-defeat",
+        "seed": "123456789abcdef00fedcba987654321",
+        "initialRevision": 0,
+        "overrides": {
+          "P1.hitPoints": 6,
+          "P2.hand.append": "attack.steadfast-strike.v1#03",
+          "drawPile.removeFirst": true,
+          "attack.steadfast-strike.v1#03.ownerPlayerId": "P2",
+          "attack.steadfast-strike.v1#03.zone": "HAND"
+        }
+      },
+      "input": {
+        "commands": [
+          {
+            "commandId": "g01-command-001",
+            "playerId": "P2",
+            "expectedRevision": 0,
+            "commandType": "PLAY_CARD",
+            "payload": {
+              "cardInstanceId": "attack.steadfast-strike.v1#01",
+              "playMode": "RELEASE",
+              "targetPlayerId": "P1"
+            }
+          },
+          {
+            "commandId": "g01-command-002",
+            "playerId": "P1",
+            "expectedRevision": 1,
+            "commandType": "ACCEPT_DAMAGE",
+            "payload": {}
+          }
+        ]
+      },
+      "initialStateHash": "b0de0dcf5d726b0f1c3d484b23ae2f206d0fb927f6af79b5a8b4f83a1ee896bb",
+      "eventTypes": [
+        "COMMAND_ACCEPTED",
+        "CARD_PLAYED",
+        "COMMAND_ACCEPTED",
+        "RESPONSE_ACCEPTED",
+        "DAMAGE_PLAYER_APPLIED",
+        "PLAYER_DEFEATED",
+        "JUDGMENT_COMPUTED",
+        "MATCH_FINISHED"
+      ],
+      "revisionSnapshots": [1, 2],
+      "randomConsumptionCounts": [36, 36],
+      "stateHashes": [
+        "49c64c9cf82c46721240f2daf24ed6b5c6cb28359f9ff8f523b95d78077edef6",
+        "602b8c69b4921a17a55ed39263ffc0d5cd5094506a6cbff57eee46964579a986"
+      ],
+      "finalStateHash": "602b8c69b4921a17a55ed39263ffc0d5cd5094506a6cbff57eee46964579a986",
+      "stateHashInputFixture": "g01-state-hash-input.json",
+      "legacyP0_06Hash": "5a71a8de1fc13516e5494ddd1f4a2c3f35ab4303291dd541cc7cd46b4c98283c"
+    },
+    "g02": {
+      "harness": "direct-effect-queue",
+      "harnessBoundary": {
+        "executor": "resolveEffectQueue",
+        "commandAcceptedEvent": false,
+        "revisionBefore": 1,
+        "revisionAfter": 1,
+        "note": "This internal effect harness does not model a command acceptance transition. The P0-06 revision 0 to 1 boundary is intentionally not claimed by this case."
+      },
+      "initialState": {
+        "source": "createAlpha12Setup",
+        "matchId": "golden-g02-world-collapse",
+        "seed": "123456789abcdef00fedcba987654321",
+        "initialRevision": 1,
+        "phase": "RESOLUTION",
+        "activePlayerId": null,
+        "worldDurability": 80,
+        "triggeredThresholds": [],
+        "P1.hitPoints": 30,
+        "P2.hitPoints": 30
+      },
+      "input": {
+        "effects": [
+          {
+            "effectId": "effect.g02.0001",
+            "commandType": "DAMAGE_PLAYER",
+            "source": {
+              "sourceKind": "CARD",
+              "ownerPlayerId": "P1",
+              "cardDefinitionId": "attack.rift-pebble.v1",
+              "cardInstanceId": "attack.rift-pebble.v1#02",
+              "mode": "RELEASE"
+            },
+            "target": { "targetKind": "PLAYER", "playerId": "P2" },
+            "payload": { "amount": 30, "damageKind": "DIRECT" },
+            "attributionPolicy": "NO_LEDGER",
+            "executionTiming": "IMMEDIATE"
+          },
+          {
+            "effectId": "effect.g02.0002",
+            "commandType": "DAMAGE_WORLD",
+            "source": {
+              "sourceKind": "CARD",
+              "ownerPlayerId": "P1",
+              "cardDefinitionId": "attack.rift-pebble.v1",
+              "cardInstanceId": "attack.rift-pebble.v1#02",
+              "mode": "RELEASE"
+            },
+            "target": { "targetKind": "WORLD" },
+            "payload": { "amount": 80, "reason": "CARD_RELEASE" },
+            "attributionPolicy": "SOURCE_OWNER",
+            "executionTiming": "IMMEDIATE"
+          }
+        ]
+      },
+      "initialStateHash": "2cece94a3a1775ca2b97a99be6693e7cbf755133bb987e91eb6bde5091dd1c6c",
+      "eventTypes": [
+        "DAMAGE_PLAYER_APPLIED",
+        "PLAYER_DEFEATED",
+        "DAMAGE_WORLD_APPLIED",
+        "WORLD_THRESHOLD_TRIGGERED",
+        "WORLD_THRESHOLD_TRIGGERED",
+        "WORLD_THRESHOLD_TRIGGERED",
+        "WORLD_LAW_EFFECT_APPLIED",
+        "WORLD_LAW_EFFECT_APPLIED",
+        "WORLD_LAW_EFFECT_APPLIED",
+        "WORLD_COLLAPSED",
+        "JUDGMENT_COMPUTED",
+        "MATCH_FINISHED"
+      ],
+      "revisionSnapshots": [1],
+      "randomConsumptionCounts": [36],
+      "stateHashes": ["4babd8496ad012d8642baa395d840a47921ae81fac528c7829c6d889b32ce775"],
+      "finalStateHash": "4babd8496ad012d8642baa395d840a47921ae81fac528c7829c6d889b32ce775",
+      "stateHashInputFixture": "g02-state-hash-input.json",
+      "legacyP0_06Hash": "3fb02be15bc2ea4aaa4b6f4044381de3d5eaeb752124f1becd9b28ccf7b3e46b"
+    },
+    "g03": {
+      "harness": "direct-effect-queue",
+      "harnessBoundary": {
+        "executor": "resolveEffectQueue",
+        "commandAcceptedEvent": false,
+        "revisionBefore": 1,
+        "revisionAfter": 1,
+        "note": "This internal effect harness does not model a command acceptance transition. The P0-06 revision 0 to 1 boundary is intentionally not claimed by this case."
+      },
+      "initialState": {
+        "source": "createAlpha12Setup",
+        "matchId": "golden-g03-simultaneous-reflection",
+        "seed": "123456789abcdef00fedcba987654321",
+        "initialRevision": 1,
+        "phase": "RESOLUTION",
+        "activePlayerId": null,
+        "worldDurability": 30,
+        "triggeredThresholds": [],
+        "P1.hitPoints": 10,
+        "P2.hitPoints": 10,
+        "pendingAttack": {
+          "pendingAttackId": "golden-g03-attack",
+          "attackingPlayerId": "P1",
+          "defendingPlayerId": "P2",
+          "baseDamage": 10
+        }
+      },
+      "input": {
+        "effects": [
+          {
+            "effectId": "effect.g03.0001",
+            "commandType": "DAMAGE_PLAYER",
+            "source": {
+              "sourceKind": "CARD",
+              "ownerPlayerId": "P1",
+              "cardDefinitionId": "attack.rift-pebble.v1",
+              "cardInstanceId": "attack.rift-pebble.v1#02",
+              "mode": "RELEASE"
+            },
+            "target": { "targetKind": "PLAYER", "playerId": "P2" },
+            "payload": { "amount": 10, "damageKind": "DIRECT" },
+            "attributionPolicy": "NO_LEDGER",
+            "executionTiming": "AFTER_RESPONSE_MODIFIERS"
+          },
+          {
+            "effectId": "effect.g03.0002",
+            "commandType": "REFLECT_DAMAGE",
+            "source": {
+              "sourceKind": "CARD",
+              "ownerPlayerId": "P1",
+              "cardDefinitionId": "attack.rift-pebble.v1",
+              "cardInstanceId": "attack.rift-pebble.v1#02",
+              "mode": "RELEASE"
+            },
+            "target": { "targetKind": "PLAYER", "playerId": "P1" },
+            "payload": { "amount": 10, "pendingAttackId": "golden-g03-attack" },
+            "attributionPolicy": "NO_LEDGER",
+            "executionTiming": "IMMEDIATE"
+          },
+          {
+            "effectId": "effect.g03.0003",
+            "commandType": "DAMAGE_WORLD",
+            "source": {
+              "sourceKind": "CARD",
+              "ownerPlayerId": "P1",
+              "cardDefinitionId": "attack.rift-pebble.v1",
+              "cardInstanceId": "attack.rift-pebble.v1#02",
+              "mode": "RELEASE"
+            },
+            "target": { "targetKind": "WORLD" },
+            "payload": { "amount": 30, "reason": "CARD_RELEASE" },
+            "attributionPolicy": "SOURCE_OWNER",
+            "executionTiming": "IMMEDIATE"
+          }
+        ]
+      },
+      "initialStateHash": "6d801fdb0aabfde7d96df8923b1e93f5d414a36c8aca37b5ced83d61370be297",
+      "eventTypes": [
+        "DAMAGE_PLAYER_APPLIED",
+        "PLAYER_DEFEATED",
+        "REFLECT_DAMAGE_APPLIED",
+        "DAMAGE_PLAYER_APPLIED",
+        "PLAYER_DEFEATED",
+        "DAMAGE_WORLD_APPLIED",
+        "WORLD_THRESHOLD_TRIGGERED",
+        "WORLD_LAW_EFFECT_APPLIED",
+        "WORLD_COLLAPSED",
+        "JUDGMENT_COMPUTED",
+        "MATCH_FINISHED"
+      ],
+      "revisionSnapshots": [1],
+      "randomConsumptionCounts": [36],
+      "stateHashes": ["fe92cf144e1e900c5cf15324776beef99f87e18cb4ce7f62c3ec1842eb9a139f"],
+      "finalStateHash": "fe92cf144e1e900c5cf15324776beef99f87e18cb4ce7f62c3ec1842eb9a139f",
+      "stateHashInputFixture": "g03-state-hash-input.json",
+      "legacyP0_06Hash": "e627f69a3bf8c319570f7645a6b059926468c8f61c71136b08aed55187ba9577"
+    }
+  }
+}

@@ -65,7 +65,7 @@ const COMMAND_TYPES: readonly CommandType[] = [
 
 const ID_PATTERN = /^[A-Za-z0-9][A-Za-z0-9._:#-]{0,127}$/;
 
-function rejection(code: CommandRejectionCode, message: string, commandId: string | null = null): ValidationResult {
+function rejection(code: CommandRejectionCode, message: string, commandId: string | null = null): Extract<ValidationResult, { readonly ok: false }> {
   return { ok: false, error: { code, message, commandId } };
 }
 
@@ -94,7 +94,7 @@ function isCommandType(value: unknown): value is CommandType {
   return typeof value === "string" && COMMAND_TYPES.includes(value as CommandType);
 }
 
-function commandPhaseAllowed(state: GameState, commandType: CommandType, playerId: PlayerId): ValidationResult | null {
+function commandPhaseAllowed(state: GameState, commandType: CommandType, playerId: PlayerId): Extract<ValidationResult, { readonly ok: false }> | null {
   if (state.phase === "FINISHED") return rejection("MATCH_FINISHED", "FINISHED state accepts no commands", null);
   if (state.phase === "RESOLUTION") {
     return rejection("RESOLUTION_IN_PROGRESS", "RESOLUTION does not accept external commands", null);
@@ -137,8 +137,8 @@ export function validateCommand(state: GameState, input: unknown, options: Comma
 
   const commandId = typeof input.commandId === "string" ? input.commandId : null;
   if (!isId(input.commandId)) return rejection("INVALID_COMMAND_ID", "commandId must be a stable non-empty identifier", commandId);
-  if (!isPlayerId(state, input.playerId)) return rejection("INVALID_PLAYER_ID", "playerId is not in this match", input.commandId);
-  if (!Number.isSafeInteger(input.expectedRevision) || input.expectedRevision < 0) {
+  if (!isPlayerId(state, input.playerId)) return rejection("INVALID_PLAYER_ID", "playerId is not in this match", typeof input.commandId === "string" ? input.commandId : null);
+  if (typeof input.expectedRevision !== "number" || !Number.isSafeInteger(input.expectedRevision) || input.expectedRevision < 0) {
     return rejection("INVALID_REVISION", "expectedRevision must be a non-negative safe integer", input.commandId);
   }
   if (!isCommandType(input.commandType)) {
@@ -165,7 +165,7 @@ export function validateCommand(state: GameState, input: unknown, options: Comma
     return rejection("STALE_REVISION", `expectedRevision ${input.expectedRevision} does not match ${state.revision}`, input.commandId);
   }
   const phaseError = commandPhaseAllowed(state, input.commandType, input.playerId);
-  if (phaseError) return { ...phaseError, error: { ...phaseError.error, commandId: input.commandId } };
+  if (phaseError) return { ok: false, error: { ...phaseError.error, commandId: typeof input.commandId === "string" ? input.commandId : null } };
 
   const payload = input.payload;
   if (input.commandType === "PLAY_CARD") {
@@ -193,10 +193,10 @@ export function validateCommand(state: GameState, input: unknown, options: Comma
         playerId: input.playerId,
         cardInstanceId: payload.cardInstanceId,
         mode: payload.playMode,
-        targetPlayerId: payload.targetPlayerId ?? null,
-        discardCardInstanceId: payload.discardCardInstanceId ?? null,
+        targetPlayerId: typeof payload.targetPlayerId === "string" ? payload.targetPlayerId as PlayerId : null,
+        discardCardInstanceId: typeof payload.discardCardInstanceId === "string" ? payload.discardCardInstanceId : null,
       });
-      if (!condition.ok) return rejection(condition.code, condition.message, input.commandId);
+      if (condition.ok === false) return rejection(condition.code, condition.message, input.commandId);
     }
     return { ok: true, kind: "NEW", command: { ...input, payload: { ...payload } } as Command };
   }
@@ -231,7 +231,7 @@ export function validateCommand(state: GameState, input: unknown, options: Comma
         cardInstanceId: payload.cardInstanceId,
         mode: "RESPONSE",
       });
-      if (!condition.ok) return rejection(condition.code, condition.message, input.commandId);
+      if (condition.ok === false) return rejection(condition.code, condition.message, input.commandId);
     }
     return { ok: true, kind: "NEW", command: { ...input, payload: { ...payload } } as Command };
   }

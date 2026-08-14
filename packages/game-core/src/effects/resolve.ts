@@ -109,7 +109,7 @@ function event(effect: EffectCommand, type: string, details: Record<string, Scal
 }
 
 function reject(effect: EffectCommand, code: EffectRejectionCode, values: Record<string, Scalar> = {}) {
-  return { state: null, result: result(effect, "REJECTED", { before: values, rejectionCode: code }) };
+  return { state: null, result: result(effect, "REJECTED", { before: values, rejectionCode: code }), events: [] as EffectEvent[] };
 }
 
 function targetPlayerId(target: EffectTarget): PlayerId | null {
@@ -244,7 +244,7 @@ function validateEffectCommand(state: GameState, input: unknown): { ok: true; ef
     "EXPLICIT_CARD_INSTANCE",
     "NEWEST_CARD_INSTANCE",
     "OLDEST_CARD_INSTANCE",
-  ].includes(String(payload.selection?.selectionKind)) || !["CARD_EFFECT", "OVERFLOW", "TIMEOUT"].includes(String(payload.reason)))) return { ok: false, code: "EFFECT_MISSING_FIELD" };
+  ].includes(String((payload.selection as { readonly selectionKind?: unknown } | undefined)?.selectionKind)) || !["CARD_EFFECT", "OVERFLOW", "TIMEOUT"].includes(String(payload.reason)))) return { ok: false, code: "EFFECT_MISSING_FIELD" };
   if ((type === "DAMAGE_WORLD" || type === "RESTORE_WORLD") && !["CARD_RELEASE", "CARD_RESPONSE", "FIELD_EFFECT", "WORLD_LAW"].includes(String(payload.reason))) return { ok: false, code: "EFFECT_MISSING_FIELD" };
   if (type === "CLEAR_FIELD" && !["CARD_RELEASE", "CARD_EFFECT", "WORLD_LAW"].includes(String(payload.reason))) return { ok: false, code: "EFFECT_MISSING_FIELD" };
   if (type === "MODIFY_STAT_UNTIL_TURN_END" && !["INCOMING_DAMAGE_REDUCTION", "ACTION_DAMAGE"].includes(String(payload.stat))) return { ok: false, code: "EFFECT_MISSING_FIELD" };
@@ -635,7 +635,7 @@ export function beginPendingAttack(state: GameState, pending: Omit<PendingAttack
 
 export function applyEffect(state: GameState, input: unknown, usedEffectIds: ReadonlySet<string> = new Set()) {
   const validation = validateEffectCommand(state, input);
-  if (!validation.ok) {
+  if (validation.ok === false) {
     const effect = (isRecord(input) ? input : { effectId: "effect.invalid.0000", commandType: "DAMAGE_PLAYER" }) as unknown as EffectCommand;
     return { state, result: result(effect, "REJECTED", { rejectionCode: validation.code }), events: [] as EffectEvent[] };
   }
@@ -643,7 +643,7 @@ export function applyEffect(state: GameState, input: unknown, usedEffectIds: Rea
   if (usedEffectIds.has(effect.effectId)) return { state, result: result(effect, "REJECTED", { rejectionCode: "EFFECT_DUPLICATE_ID" }), events: [] as EffectEvent[] };
   let transition: { state: GameState | null; result: EffectExecutionResult; events: EffectEvent[] };
   switch (effect.commandType) {
-    case "DAMAGE_PLAYER": transition = applyDamage(state, effect, effect.payload as DamagePlayerPayload, effect.payload.damageKind === "REFLECTION"); break;
+    case "DAMAGE_PLAYER": transition = applyDamage(state, effect, effect.payload as DamagePlayerPayload, (effect.payload as DamagePlayerPayload).damageKind === "REFLECTION"); break;
     case "HEAL_PLAYER": {
       const playerId = targetPlayerId(effect.target); const payload = effect.payload as HealPlayerPayload;
       if (!playerId || state.players[playerId].hitPoints <= 0) transition = reject(effect, "EFFECT_REVIVE_FORBIDDEN");
@@ -795,6 +795,9 @@ export function resolveEffectQueue(state: GameState, effects: readonly EffectCom
     if (transition.result.status === "REJECTED" || transition.result.status === "INVALID_MATCH") {
       return { committed: false, state, results: [...results, transition.result], events: [], rejectionCode: transition.result.rejectionCode };
     }
+    if (!transition.state) {
+      return { committed: false, state, results: [...results, transition.result], events: [], rejectionCode: "EFFECT_STATE_INCONSISTENT" };
+    }
     if (transition.result.eventTypes.includes("FIELD_EFFECT_APPLIED")) {
       effectBudgetUsed += 1;
       if (effectBudgetUsed > state.ruleset.maxEffectsPerResolution) {
@@ -872,8 +875,10 @@ export function resolveEffectQueue(state: GameState, effects: readonly EffectCom
     if (generatedTransition.result.status === "REJECTED" || generatedTransition.result.status === "INVALID_MATCH") {
       return { ok: false, rejectionCode: generatedTransition.result.rejectionCode ?? "EFFECT_STATE_INCONSISTENT" };
     }
+    const generatedState = generatedTransition.state;
+    if (!generatedState) return { ok: false, rejectionCode: "EFFECT_STATE_INCONSISTENT" };
     const resolvedDetails = typeof details === "function" ? details(generatedTransition.result) : details;
-    const decorated = annotateWorldLawTransition(generatedTransition, generatedEffect, resolvedDetails);
+    const decorated = annotateWorldLawTransition({ ...generatedTransition, state: generatedState }, generatedEffect, resolvedDetails);
     usedIds.add(generatedEffect.effectId);
     working = { ...stateTransform(decorated.state), effectQueue: [] };
     results.push(decorated.result);
@@ -893,7 +898,7 @@ export function resolveEffectQueue(state: GameState, effects: readonly EffectCom
       if (targets.length === 0) {
         const generated = worldLawRevealEffect(working, generatedEffectId("world-law"), 75);
         const applied = applyGenerated(generated, { threshold: 75, targetPlayerId: null, penalty: 0 });
-        if (!applied.ok) return { committed: false, state: invalidMatchState(state), results, events: [], rejectionCode: applied.rejectionCode };
+        if (applied.ok === false) return { committed: false, state: invalidMatchState(state), results, events: [], rejectionCode: applied.rejectionCode };
       } else {
         for (const playerId of targets) {
           const generated: EffectCommand = {
@@ -906,7 +911,7 @@ export function resolveEffectQueue(state: GameState, effects: readonly EffectCom
             executionTiming: "WORLD_LAW_PHASE",
           };
           const applied = applyGenerated(generated, { threshold: 75, targetPlayerId: playerId, penalty });
-          if (!applied.ok) return { committed: false, state: invalidMatchState(state), results, events: [], rejectionCode: applied.rejectionCode };
+          if (applied.ok === false) return { committed: false, state: invalidMatchState(state), results, events: [], rejectionCode: applied.rejectionCode };
         }
       }
     }
@@ -927,18 +932,18 @@ export function resolveEffectQueue(state: GameState, effects: readonly EffectCom
           targetPlayerId: lastEffectiveRestorePlayerId,
           draw: generatedResult.effective ?? 0,
         }));
-        if (!applied.ok) return { committed: false, state: invalidMatchState(state), results, events: [], rejectionCode: applied.rejectionCode };
+        if (applied.ok === false) return { committed: false, state: invalidMatchState(state), results, events: [], rejectionCode: applied.rejectionCode };
       } else {
         const generated = worldLawRevealEffect(working, generatedEffectId("world-law"), 50);
         const applied = applyGenerated(generated, { threshold: 50, targetPlayerId: null, draw: 0 });
-        if (!applied.ok) return { committed: false, state: invalidMatchState(state), results, events: [], rejectionCode: applied.rejectionCode };
+        if (applied.ok === false) return { committed: false, state: invalidMatchState(state), results, events: [], rejectionCode: applied.rejectionCode };
       }
     }
 
     if (threshold === 25) {
       const generated = worldLawRevealEffect(working, generatedEffectId("world-law"), 25);
       const applied = applyGenerated(generated, { threshold: 25, targetPlayerId: null }, activateFragileWorld);
-      if (!applied.ok) return { committed: false, state: invalidMatchState(state), results, events: [], rejectionCode: applied.rejectionCode };
+      if (applied.ok === false) return { committed: false, state: invalidMatchState(state), results, events: [], rejectionCode: applied.rejectionCode };
     }
   }
 

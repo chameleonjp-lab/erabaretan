@@ -773,7 +773,7 @@ copiesInDeck
 
 ### Step 5
 
-**P0-05：決定的乱数生成器と固定試験値を定義する。**
+**P0-05：決定的乱数生成器と固定試験値を[正本](20_DETERMINISTIC_RNG_AND_FIXED_VECTORS_V1.md)へ定義する。**
 
 ### Step 6
 

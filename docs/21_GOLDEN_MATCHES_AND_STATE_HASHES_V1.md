@@ -93,7 +93,33 @@ G01の最終カード領域は、P2が最初の手番開始時に山札の先頭
 {"hands":{"P1":["attack.rift-pebble.v1#02","intervention.judgment-of-scars.v1#01","attack.star-breaker.v1#01","intervention.careful-redraw.v1#01","field.frenzied-fracture.v1#01","intervention.verdant-bargain.v1#02","intervention.judgment-of-scars.v1#03"],"P2":["field.frenzied-fracture.v1#02","field.root-sanctuary.v1#02","intervention.oath-of-renewal.v1#01","attack.star-breaker.v1#02","intervention.field-nullification.v1#01","field.root-sanctuary.v1#03","attack.steadfast-strike.v1#03"]},"drawPile":["intervention.verdant-bargain.v1#03","defense.ashen-bulwark.v1#03","intervention.oath-of-renewal.v1#03","intervention.careful-redraw.v1#03","attack.rift-pebble.v1#01","defense.guardian-veil.v1#03","field.root-sanctuary.v1#01","intervention.field-nullification.v1#02","intervention.careful-redraw.v1#02","intervention.oath-of-renewal.v1#02","attack.rift-pebble.v1#03","intervention.verdant-bargain.v1#01","intervention.judgment-of-scars.v1#02","attack.steadfast-strike.v1#02","defense.ashen-bulwark.v1#01","defense.guardian-veil.v1#02","field.frenzied-fracture.v1#03","attack.star-breaker.v1#03","defense.ashen-bulwark.v1#02","defense.guardian-veil.v1#01","intervention.field-nullification.v1#03"],"discardPile":["attack.steadfast-strike.v1#01"],"revealedCards":["attack.steadfast-strike.v1#01"]}
 ~~~
 
-### 2.5 変更検出
+### 2.5 ゴールデン試験の共通最終項目
+
+三つの試験のハッシュ入力では、個別に記載がない限り、次を固定する。
+
+~~~text
+stateHashVersion: state-hash.alpha-12.v1
+engineVersion: game-core.alpha-12.v1
+rngAlgorithmVersion: rng.xoshiro128ss.v1
+shuffleAlgorithmVersion: shuffle.fisher-yates-desc.v1
+seed: 123456789abcdef00fedcba987654321
+randomConsumptionCount: 36
+activeField: null
+activePlayerId: null
+pendingAction: null
+effectQueue: []
+roundNumber: 1
+turnSequence: 1
+players.maxHitPoints: 30
+players.survivedRoundCount: 1
+players.effectiveWorldRestore: 0
+players.hand: cardZones.handsと同じ配列
+judgment.playerScores: 最終状態欄に記載した値
+~~~
+
+G01のstatusEffectsはfragileWorld=false、nextDefensePenalty=0とする。G02は両者のfragileWorld=true、P1のnextDefensePenalty=2、P2のnextDefensePenalty=0とする。G03は両者のfragileWorld=true、nextDefensePenalty=0とする。
+
+### 2.6 変更検出
 
 体力、手札順、山札先頭、世界責任、発生済み境界、randomConsumptionCountを一つだけ変更したコピーは、すべてハッシュが変わらなければならない。表示名やイベント表示文だけの変更では、ハッシュを変えない。
 

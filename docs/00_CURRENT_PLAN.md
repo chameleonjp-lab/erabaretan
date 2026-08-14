@@ -63,6 +63,7 @@
 
 1. [ルールエンジン契約](08_RULE_ENGINE_CONTRACT.md)
 2. [ruleset alpha-12 と砕けゆく原初界](17_RULESET_ALPHA_12_V1.md)
+3. [alpha-12 Fixture仕様](18_FIXTURES_ALPHA_12_V1.md)
 
 状態遷移、補充順、手札上限、命令受理、効果、世界境界、終了、採点、リプレイ、不変条件の詳細を扱う。
 
@@ -243,9 +244,12 @@ P0では次を揃える。
 
 **P0-02「最初の世界律とruleset検証値」は完了。**
 
+**P0-03「Fixture A〜F、X01〜X14の仕様化」は完了。**
+
 正本：
 
 - [初期12種類カード仕様 V1](16_INITIAL_12_CARD_SPEC_V1.md)
 - [ruleset alpha-12 と砕けゆく原初界 V1](17_RULESET_ALPHA_12_V1.md)
+- [alpha-12 Fixture仕様 V1](18_FIXTURES_ALPHA_12_V1.md)
 
-次の作業は、P0-03「Fixture A〜F、X01〜X14の仕様化」である。P0-03完了まで、`game-core`本実装と画面実装は開始しない。
+次の作業は、P0-04「共通効果命令の正式な型」である。P0-04、P0-05、P0-06が終わるまで、`game-core`本実装と画面実装は開始しない。

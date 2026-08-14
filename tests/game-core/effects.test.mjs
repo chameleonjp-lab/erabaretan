@@ -41,11 +41,15 @@ function makeState(overrides = {}) {
   });
 }
 
-const source = (ownerPlayerId = "P1") => ({
+const source = (
+  ownerPlayerId = "P1",
+  cardDefinitionId = ownerPlayerId === "P2" ? "attack.steadfast-strike.v1" : "attack.star-breaker.v1",
+  cardInstanceId = ownerPlayerId === "P2" ? "p2-filler-01" : "p1-star-01",
+) => ({
   sourceKind: "CARD",
   ownerPlayerId,
-  cardDefinitionId: "attack.star-breaker.v1",
-  cardInstanceId: "p1-star-01",
+  cardDefinitionId,
+  cardInstanceId,
   mode: "RELEASE",
 });
 
@@ -184,7 +188,7 @@ test("world damage and restoration record only effective ledger values", () => {
     { targetKind: "WORLD" },
     { amount: 7, reason: "CARD_RESPONSE" },
     "effect.resolution-0001.0002",
-    { source: { ...source("P2"), cardInstanceId: "p2-filler-01" } },
+    { source: source("P2") },
   ));
   assert.equal(restore.result.effective, 7);
   assert.deepEqual(restore.result.ledgerDelta, {
@@ -219,6 +223,62 @@ test("world effects honor NO_LEDGER and reject unknown hand owners without throw
   assert.equal(invalidTarget.result.status, "REJECTED");
   assert.equal(invalidTarget.result.rejectionCode, "EFFECT_BAD_TARGET");
   assert.equal(invalidTarget.state, state);
+});
+
+test("card effect sources must identify the existing owned card definition", () => {
+  const state = makeState({ worldDurability: 90 });
+  const invalidSource = applyEffect(state, effect(
+    "DAMAGE_WORLD",
+    { targetKind: "WORLD" },
+    { amount: 2, reason: "CARD_RELEASE" },
+    "effect.resolution-0001.0003",
+    { source: { ...source(), cardInstanceId: "missing-card-01" } },
+  ));
+  assert.equal(invalidSource.result.status, "REJECTED");
+  assert.equal(invalidSource.result.rejectionCode, "EFFECT_BAD_SOURCE");
+  assert.equal(invalidSource.state, state);
+});
+
+test("the 75 penalty does not consume a persistent shield", () => {
+  const state = makeState({
+    players: [
+      { playerId: "P1", hand: ["p1-star-01"], hitPoints: 8 },
+      {
+        playerId: "P2",
+        hand: ["p2-filler-01"],
+        hitPoints: 30,
+        nextDefensePenalty: 2,
+      },
+    ],
+  });
+  let pending = withPendingAttack({
+    ...state,
+    players: {
+      ...state.players,
+      P2: {
+        ...state.players.P2,
+        statusEffects: {
+          ...state.players.P2.statusEffects,
+          shields: [{ amount: 5, scope: "NEXT_APPLICABLE_ATTACK", pendingAttackId: null, expiresAfterTurnSequence: 4 }],
+        },
+      },
+    },
+  });
+  const shield = applyEffect(pending, effect(
+    "ADD_SHIELD",
+    { targetKind: "CURRENT_PENDING_ATTACK", pendingAttackId: "attack-0001" },
+    { amount: 1, scope: "CURRENT_PENDING_ATTACK", pendingAttackId: "attack-0001" },
+  ));
+  pending = shield.state;
+  const damage = applyEffect(pending, effect(
+    "DAMAGE_PLAYER",
+    { targetKind: "PLAYER", playerId: "P2" },
+    { amount: 10, damageKind: "DIRECT" },
+  ));
+  assert.equal(damage.result.effective, 5);
+  assert.equal(damage.state.players.P2.hitPoints, 25);
+  assert.deepEqual(damage.state.players.P2.statusEffects.shields, []);
+  assert.equal(damage.state.players.P2.statusEffects.nextDefensePenalty, 0);
 });
 
 test("draw and discard preserve card uniqueness and hand order", () => {

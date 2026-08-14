@@ -21,6 +21,8 @@ export interface PlayCardPayload {
   readonly cardInstanceId: CardInstanceId;
   readonly playMode: PlayMode;
   readonly targetPlayerId?: PlayerId;
+  /** Optional card-effect selection used by cards such as careful-redraw. */
+  readonly discardCardInstanceId?: CardInstanceId;
 }
 
 export interface DiscardCardPayload {

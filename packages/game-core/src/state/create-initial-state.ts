@@ -1,4 +1,5 @@
 import type {
+  ActiveFieldState,
   CardInstanceId,
   CardInstanceState,
   CardZones,
@@ -43,10 +44,12 @@ export interface CreateInitialGameStateInput {
   readonly turnSequence?: number;
   readonly worldDurability?: number;
   readonly triggeredThresholds?: readonly number[];
+  readonly activeField?: ActiveFieldState | null;
+  readonly collapseResponsiblePlayerId?: PlayerId | null;
   readonly randomConsumptionCount?: number;
 }
 
-function createPlayer(input: InitialPlayerInput, ruleset: RulesetSnapshot): PlayerState {
+function createPlayer(input: InitialPlayerInput, ruleset: RulesetSnapshot, fragileWorldFromThreshold: boolean): PlayerState {
   return {
     playerId: input.playerId,
     hitPoints: input.hitPoints ?? ruleset.startingHp,
@@ -57,7 +60,7 @@ function createPlayer(input: InitialPlayerInput, ruleset: RulesetSnapshot): Play
     survivedRoundCount: input.survivedRoundCount ?? 1,
     statusEffects: {
       nextDefensePenalty: input.nextDefensePenalty ?? 0,
-      fragileWorld: input.fragileWorld ?? false,
+      fragileWorld: input.fragileWorld ?? fragileWorldFromThreshold,
       shields: [],
       statModifiers: [],
     },
@@ -67,12 +70,13 @@ function createPlayer(input: InitialPlayerInput, ruleset: RulesetSnapshot): Play
 export function createInitialGameState(input: CreateInitialGameStateInput): GameState {
   const ruleset = input.ruleset ?? ALPHA_12_RULESET;
   const playerInputs = input.players;
+  const fragileWorldFromThreshold = input.triggeredThresholds?.includes(25) ?? false;
   const players: Record<PlayerId, PlayerState> = {};
   for (const playerInput of playerInputs) {
     if (players[playerInput.playerId]) {
       throw new Error(`Duplicate playerId: ${playerInput.playerId}`);
     }
-    players[playerInput.playerId] = createPlayer(playerInput, ruleset);
+    players[playerInput.playerId] = createPlayer(playerInput, ruleset, fragileWorldFromThreshold);
   }
 
   if (!players[input.firstPlayerId]) {
@@ -119,9 +123,9 @@ export function createInitialGameState(input: CreateInitialGameStateInput): Game
       maxDurability: ruleset.worldMaxDurability,
       triggeredThresholds: [...(input.triggeredThresholds ?? [])],
       worldLawId: ruleset.worldLawId,
-      collapseResponsiblePlayerId: null,
+      collapseResponsiblePlayerId: input.collapseResponsiblePlayerId ?? null,
     },
-    activeField: null,
+    activeField: input.activeField ?? null,
     pendingAction: null,
     pendingAttack: null,
     effectQueue: [],

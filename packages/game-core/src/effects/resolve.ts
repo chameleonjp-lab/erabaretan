@@ -1,4 +1,5 @@
 import { assertGameState } from "../state/invariants.ts";
+import { finalizeTerminalState } from "../terminal/resolve.ts";
 import type {
   CardInstanceState,
   GameState,
@@ -170,6 +171,16 @@ function validateEffectCommand(state: GameState, input: unknown): { ok: true; ef
   if (source.sourceKind === "CARD" && (!source.ownerPlayerId || typeof source.cardDefinitionId !== "string" || typeof source.cardInstanceId !== "string")) {
     return { ok: false, code: "EFFECT_BAD_SOURCE" };
   }
+  if (source.sourceKind === "CARD") {
+    const sourceCard = state.cardInstances[String(source.cardInstanceId)];
+    if (
+      !sourceCard
+      || sourceCard.ownerPlayerId !== source.ownerPlayerId
+      || sourceCard.cardDefinitionId !== source.cardDefinitionId
+    ) {
+      return { ok: false, code: "EFFECT_BAD_SOURCE" };
+    }
+  }
   if (typeof target.targetKind !== "string") return { ok: false, code: "EFFECT_BAD_TARGET" };
   const type = input.commandType as EffectCommandType;
   const playerTargetTypes = new Set(["DAMAGE_PLAYER", "HEAL_PLAYER", "PAY_HP", "REFLECT_DAMAGE", "MODIFY_STAT_UNTIL_TURN_END", "MODIFY_NEXT_ACTION"]);
@@ -204,6 +215,9 @@ function validateEffectCommand(state: GameState, input: unknown): { ok: true; ef
   }
   if (type === "SET_FIELD" && (!isInteger(payload.expiresAfterTurnSequence, 1, Number.MAX_SAFE_INTEGER) || typeof payload.fieldDefinitionId !== "string" || !state.players[String(payload.ownerPlayerId)])) {
     return { ok: false, code: "EFFECT_OUT_OF_RANGE" };
+  }
+  if (type === "SET_FIELD" && state.ruleset.fieldDefinitionIds && !state.ruleset.fieldDefinitionIds.includes(String(payload.fieldDefinitionId))) {
+    return { ok: false, code: "EFFECT_CONDITION_NOT_MET" };
   }
   if (type === "MODIFY_STAT_UNTIL_TURN_END" && (!isInteger(payload.delta, -30, 30) || payload.delta === 0 || !isInteger(payload.expiresAfterTurnSequence, 1, Number.MAX_SAFE_INTEGER))) {
     return { ok: false, code: "EFFECT_OUT_OF_RANGE" };
@@ -268,6 +282,7 @@ function applyDamage(
   if (!playerId) return reject(effect, "EFFECT_BAD_TARGET");
   const player = state.players[playerId];
   if (!player || player.hitPoints <= 0) return reject(effect, "EFFECT_CONDITION_NOT_MET", { hitPoints: player?.hitPoints ?? null });
+  const fragileWorldDamage = !bypassDefense && payload.damageKind === "FRAGILE_WORLD";
   if (!bypassDefense && effect.executionTiming === "AFTER_RESPONSE_MODIFIERS" && !state.pendingAttack) {
     return reject(effect, "EFFECT_PENDING_ATTACK_REQUIRED");
   }
@@ -276,34 +291,61 @@ function applyDamage(
   let mitigation = 0;
   let pending = state.pendingAttack;
   let applicableShields: readonly ShieldState[] = [];
-  if (!bypassDefense && effect.executionTiming === "AFTER_RESPONSE_MODIFIERS") {
-    if (!pending || pending.defendingPlayerId !== playerId) return reject(effect, "EFFECT_BAD_TARGET");
-    applicableShields = player.statusEffects.shields.filter((shield) => {
-      if (shield.scope === "NEXT_APPLICABLE_ATTACK") return (shield.expiresAfterTurnSequence ?? 0) > state.turnSequence;
-      if (shield.scope === "UNTIL_TURN_SEQUENCE") return (shield.expiresAfterTurnSequence ?? 0) > state.turnSequence;
-      return shield.pendingAttackId === pending?.pendingAttackId;
-    });
-    const persistentShield = applicableShields.reduce((total, shield) => total + shield.amount, 0);
-    const rawMitigation = pending.currentShield + pending.incomingDamageReduction + persistentShield;
-    const penalty = player.statusEffects.nextDefensePenalty;
-    mitigation = Math.max(0, Math.min(30, rawMitigation) - (rawMitigation > 0 ? penalty : 0));
-    const consumedShields = applicableShields.filter((shield) => shield.scope !== "UNTIL_TURN_SEQUENCE");
-    const nextStatus = {
-      ...player.statusEffects,
-      nextDefensePenalty: rawMitigation > 0 ? 0 : penalty,
-      shields: player.statusEffects.shields.filter((shield) => {
-        if (consumedShields.includes(shield)) return false;
-        if (shield.scope !== "CURRENT_PENDING_ATTACK" && (shield.expiresAfterTurnSequence ?? Number.MAX_SAFE_INTEGER) <= state.turnSequence) return false;
-        return true;
-      }),
-    };
-    nextState = updatePlayer(nextState, playerId, (current) => ({ ...current, statusEffects: nextStatus }));
-    pending = {
-      ...pending,
-      currentShield: 0,
-      incomingDamageReduction: 0,
-    };
-    nextState = { ...nextState, pendingAttack: pending };
+  if (!bypassDefense && (effect.executionTiming === "AFTER_RESPONSE_MODIFIERS" || fragileWorldDamage)) {
+    if (effect.executionTiming === "AFTER_RESPONSE_MODIFIERS") {
+      if (!pending || pending.defendingPlayerId !== playerId) return reject(effect, "EFFECT_BAD_TARGET");
+      applicableShields = player.statusEffects.shields.filter((shield) => {
+        if (shield.scope === "NEXT_APPLICABLE_ATTACK") return (shield.expiresAfterTurnSequence ?? 0) > state.turnSequence;
+        if (shield.scope === "UNTIL_TURN_SEQUENCE") return (shield.expiresAfterTurnSequence ?? 0) > state.turnSequence;
+        return shield.pendingAttackId === pending?.pendingAttackId;
+      });
+      const currentPendingShield = applicableShields
+        .filter((shield) => shield.scope === "CURRENT_PENDING_ATTACK")
+        .reduce((total, shield) => total + shield.amount, 0);
+      const currentDefenseMitigation = pending.currentShield + pending.incomingDamageReduction + currentPendingShield;
+      const persistentShield = applicableShields
+        .filter((shield) => shield.scope !== "CURRENT_PENDING_ATTACK")
+        .reduce((total, shield) => total + shield.amount, 0);
+      const penalty = player.statusEffects.nextDefensePenalty;
+      const adjustedCurrentDefense = Math.max(0, currentDefenseMitigation - penalty);
+      mitigation = Math.min(30, adjustedCurrentDefense + persistentShield);
+      const consumedShields = applicableShields.filter((shield) => shield.scope !== "UNTIL_TURN_SEQUENCE");
+      const nextStatus = {
+        ...player.statusEffects,
+        nextDefensePenalty: currentDefenseMitigation > 0 ? 0 : penalty,
+        shields: player.statusEffects.shields.filter((shield) => {
+          if (consumedShields.includes(shield)) return false;
+          if (shield.scope !== "CURRENT_PENDING_ATTACK" && (shield.expiresAfterTurnSequence ?? Number.MAX_SAFE_INTEGER) <= state.turnSequence) return false;
+          return true;
+        }),
+      };
+      nextState = updatePlayer(nextState, playerId, (current) => ({ ...current, statusEffects: nextStatus }));
+      pending = {
+        ...pending,
+        currentShield: 0,
+        incomingDamageReduction: 0,
+      };
+      nextState = { ...nextState, pendingAttack: pending };
+    } else {
+      // Fragile-world self damage is ordinary DAMAGE_PLAYER damage, but it is
+      // not the pending attack's damage. It can therefore consume persistent
+      // shields without consuming the current response bundle.
+      applicableShields = player.statusEffects.shields.filter((shield) => {
+        if (shield.scope === "CURRENT_PENDING_ATTACK") return false;
+        return (shield.expiresAfterTurnSequence ?? 0) > state.turnSequence;
+      });
+      mitigation = Math.min(30, applicableShields.reduce((total, shield) => total + shield.amount, 0));
+      const consumedShields = applicableShields.filter((shield) => shield.scope !== "UNTIL_TURN_SEQUENCE");
+      const nextStatus = {
+        ...player.statusEffects,
+        shields: player.statusEffects.shields.filter((shield) => {
+          if (consumedShields.includes(shield)) return false;
+          if (shield.scope !== "CURRENT_PENDING_ATTACK" && (shield.expiresAfterTurnSequence ?? Number.MAX_SAFE_INTEGER) <= state.turnSequence) return false;
+          return true;
+        }),
+      };
+      nextState = updatePlayer(nextState, playerId, (current) => ({ ...current, statusEffects: nextStatus }));
+    }
   }
 
   const effective = Math.min(Math.max(payload.amount - mitigation, 0), player.hitPoints);
@@ -441,7 +483,31 @@ function applyDamageWorld(state: GameState, effect: EffectCommand, payload: Dama
   const recordsPlayerLedger = effect.attributionPolicy === "SOURCE_OWNER" || effect.attributionPolicy === "ORIGINAL_CARD_OWNER";
   if (recordsPlayerLedger && !owner) return reject(effect, "EFFECT_BAD_SOURCE");
   const beforeDurability = state.world.durability;
-  const effective = Math.min(payload.amount, beforeDurability);
+  let requested = payload.amount;
+  let activeField = state.activeField;
+  let fieldModified = false;
+  if (
+    activeField
+    && activeField.fieldDefinitionId === "field.frenzied-fracture.v1"
+    && effect.source.sourceKind === "CARD"
+    && effect.source.mode === "RELEASE"
+    && effect.source.cardInstanceId
+    && activeField.lastFrenziedCardInstanceId !== effect.source.cardInstanceId
+  ) {
+    requested += 1;
+    fieldModified = true;
+    activeField = { ...activeField, lastFrenziedCardInstanceId: effect.source.cardInstanceId };
+  }
+  if (
+    activeField
+    && activeField.fieldDefinitionId === "field.root-sanctuary.v1"
+    && activeField.rootSanctuaryUsedTurnSequence !== state.turnSequence
+  ) {
+    requested = Math.max(0, requested - 2);
+    fieldModified = true;
+    activeField = { ...activeField, rootSanctuaryUsedTurnSequence: state.turnSequence };
+  }
+  const effective = Math.min(requested, beforeDurability);
   const afterDurability = beforeDurability - effective;
   const triggered = [...state.world.triggeredThresholds];
   for (const threshold of state.ruleset.worldThresholds) {
@@ -449,6 +515,7 @@ function applyDamageWorld(state: GameState, effect: EffectCommand, payload: Dama
   }
   const worldState: GameState = {
     ...state,
+    activeField,
     world: {
       ...state.world,
       durability: afterDurability,
@@ -459,11 +526,11 @@ function applyDamageWorld(state: GameState, effect: EffectCommand, payload: Dama
   const nextState = recordsPlayerLedger && owner
     ? updatePlayer(worldState, owner, (player) => ({ ...player, worldDamageResponsibility: player.worldDamageResponsibility + effective }))
     : worldState;
-  const eventTypes = ["DAMAGE_WORLD_APPLIED", ...triggered.filter((threshold) => !state.world.triggeredThresholds.includes(threshold)).map(() => "WORLD_THRESHOLD_TRIGGERED")];
+  const eventTypes = ["DAMAGE_WORLD_APPLIED", ...(fieldModified ? ["FIELD_EFFECT_APPLIED"] : []), ...triggered.filter((threshold) => !state.world.triggeredThresholds.includes(threshold)).map(() => "WORLD_THRESHOLD_TRIGGERED")];
   return {
     state: nextState,
-    result: result(effect, effective === 0 ? "NO_OP" : "APPLIED", { requested: payload.amount, effective, before: { worldDurability: beforeDurability }, after: { worldDurability: afterDurability }, ledgerDelta: recordsPlayerLedger && owner ? { ledgerKind: "WORLD_DAMAGE_RESPONSIBILITY", playerId: owner, amount: effective } : undefined, eventTypes }),
-    events: [event(effect, "DAMAGE_WORLD_APPLIED", { ownerPlayerId: owner, requested: payload.amount, effective }), ...triggered.filter((threshold) => !state.world.triggeredThresholds.includes(threshold)).map((threshold) => event(effect, "WORLD_THRESHOLD_TRIGGERED", { threshold }))],
+    result: result(effect, effective === 0 ? "NO_OP" : "APPLIED", { requested, effective, before: { worldDurability: beforeDurability }, after: { worldDurability: afterDurability }, ledgerDelta: recordsPlayerLedger && owner ? { ledgerKind: "WORLD_DAMAGE_RESPONSIBILITY", playerId: owner, amount: effective } : undefined, eventTypes }),
+    events: [event(effect, "DAMAGE_WORLD_APPLIED", { ownerPlayerId: owner, requested, effective }), ...(fieldModified ? [event(effect, "FIELD_EFFECT_APPLIED", { requested, effective })] : []), ...triggered.filter((threshold) => !state.world.triggeredThresholds.includes(threshold)).map((threshold) => event(effect, "WORLD_THRESHOLD_TRIGGERED", { threshold }))],
   };
 }
 
@@ -486,7 +553,7 @@ function applyRestoreWorld(state: GameState, effect: EffectCommand, payload: Res
 
 function applySetField(state: GameState, effect: EffectCommand, payload: SetFieldPayload) {
   if (payload.expiresAfterTurnSequence <= state.turnSequence || payload.ownerPlayerId !== effect.source.ownerPlayerId) return reject(effect, "EFFECT_CONDITION_NOT_MET");
-  const nextState = { ...state, activeField: { fieldDefinitionId: payload.fieldDefinitionId, ownerPlayerId: payload.ownerPlayerId, expiresAfterTurnSequence: payload.expiresAfterTurnSequence } };
+  const nextState = { ...state, activeField: { fieldDefinitionId: payload.fieldDefinitionId, ownerPlayerId: payload.ownerPlayerId, expiresAfterTurnSequence: payload.expiresAfterTurnSequence, lastFrenziedCardInstanceId: null, rootSanctuaryUsedTurnSequence: null } };
   const eventTypes = state.activeField ? ["FIELD_CLEARED", "FIELD_SET"] : ["FIELD_SET"];
   return {
     state: nextState,
@@ -616,12 +683,74 @@ function invalidMatchState(state: GameState): GameState {
   return {
     ...state,
     phase: "FINISHED",
+    activePlayerId: null,
+    respondingPlayerId: null,
     effectQueue: [],
     pendingAction: null,
     pendingAttack: null,
     terminalFlags: { ...state.terminalFlags, endKind: "INVALID_MATCH", battleWinnerId: null, divineSelectionWinnerId: null },
     judgment: null,
   };
+}
+
+function nextGeneratedEffectId(usedIds: ReadonlySet<string>, prefix: string): string {
+  for (let ordinal = 1; ordinal <= 9999; ordinal += 1) {
+    const effectId = `effect.${prefix}.${String(ordinal).padStart(4, "0")}`;
+    if (!usedIds.has(effectId)) return effectId;
+  }
+  throw new Error("generated effect id space exhausted");
+}
+
+function worldLawSource(state: GameState) {
+  return {
+    sourceKind: "WORLD_LAW" as const,
+    ownerPlayerId: null,
+    worldLawId: state.world.worldLawId,
+    mode: "SYSTEM" as const,
+  };
+}
+
+function worldLawRevealEffect(state: GameState, effectId: string, threshold: number): EffectCommand {
+  return {
+    effectId,
+    commandType: "REVEAL_PUBLIC_INFORMATION",
+    source: worldLawSource(state),
+    target: { targetKind: "PUBLIC_INFORMATION" },
+    payload: { informationKind: "WORLD_THRESHOLD", threshold },
+    attributionPolicy: "NO_LEDGER",
+    executionTiming: "WORLD_LAW_PHASE",
+  };
+}
+
+function annotateWorldLawTransition(
+  transition: { state: GameState; result: EffectExecutionResult; events: EffectEvent[] },
+  effect: EffectCommand,
+  details: Record<string, Scalar>,
+) {
+  const retainedEventTypes = transition.result.eventTypes.filter((type) => (
+    type !== "PUBLIC_INFORMATION_REVEALED"
+    && type !== "NEXT_ACTION_MODIFIED"
+    && type !== "WORLD_LAW_EFFECT_APPLIED"
+  ));
+  const retainedEvents = transition.events.filter((currentEvent) => (
+    currentEvent.type !== "PUBLIC_INFORMATION_REVEALED"
+    && currentEvent.type !== "NEXT_ACTION_MODIFIED"
+    && currentEvent.type !== "WORLD_LAW_EFFECT_APPLIED"
+  ));
+  const lawEvent = event(effect, "WORLD_LAW_EFFECT_APPLIED", details);
+  return {
+    state: transition.state,
+    result: { ...transition.result, eventTypes: ["WORLD_LAW_EFFECT_APPLIED", ...retainedEventTypes] },
+    events: [lawEvent, ...retainedEvents],
+  };
+}
+
+function activateFragileWorld(state: GameState): GameState {
+  const players = Object.fromEntries(Object.entries(state.players).map(([playerId, player]) => [
+    playerId,
+    { ...player, statusEffects: { ...player.statusEffects, fragileWorld: true } },
+  ]));
+  return { ...state, players };
 }
 
 export function resolveEffectQueue(state: GameState, effects: readonly EffectCommand[]): EffectQueueResult {
@@ -632,15 +761,204 @@ export function resolveEffectQueue(state: GameState, effects: readonly EffectCom
   const results: EffectExecutionResult[] = [];
   const events: EffectEvent[] = [];
   const usedIds = new Set<string>();
-  for (let index = 0; index < effects.length; index += 1) {
-    const transition = applyEffect(working, effects[index], usedIds);
+  const queue = [...effects];
+  const reservedEffectIds = new Set(effects.map((effect) => effect.effectId));
+  const generatedEffectId = (prefix: string): string => {
+    const effectId = nextGeneratedEffectId(new Set([...usedIds, ...reservedEffectIds]), prefix);
+    reservedEffectIds.add(effectId);
+    return effectId;
+  };
+  let effectBudgetUsed = effects.length;
+  const newlyTriggeredThresholds = new Set<number>();
+  const cardsCrossing25 = new Set<string>();
+  const fragileDamageCards = new Set<string>();
+  let pendingFragileSelfDamage: { readonly cardInstanceId: string; readonly effect: EffectCommand } | null = null;
+  let lastEffectiveRestorePlayerId: PlayerId | null = null;
+
+  let index = 0;
+  while (index < queue.length || pendingFragileSelfDamage) {
+    if (pendingFragileSelfDamage) {
+      const nextEffect = queue[index];
+      const nextCardInstanceId = nextEffect?.source.sourceKind === "CARD"
+        ? nextEffect.source.cardInstanceId
+        : undefined;
+      if (!nextEffect || nextCardInstanceId !== pendingFragileSelfDamage.cardInstanceId) {
+        queue.splice(index, 0, pendingFragileSelfDamage.effect);
+        pendingFragileSelfDamage = null;
+        continue;
+      }
+    }
+    const currentEffect = queue[index];
+    const beforeThresholds = new Set(working.world.triggeredThresholds);
+    const before25Triggered = working.world.triggeredThresholds.includes(25);
+    const transition = applyEffect(working, currentEffect, usedIds);
     if (transition.result.status === "REJECTED" || transition.result.status === "INVALID_MATCH") {
       return { committed: false, state, results: [...results, transition.result], events: [], rejectionCode: transition.result.rejectionCode };
     }
-    usedIds.add(effects[index].effectId);
-    working = { ...transition.state, effectQueue: effects.slice(index + 1) };
-    results.push(transition.result);
+    if (transition.result.eventTypes.includes("FIELD_EFFECT_APPLIED")) {
+      effectBudgetUsed += 1;
+      if (effectBudgetUsed > state.ruleset.maxEffectsPerResolution) {
+        return { committed: false, state: invalidMatchState(state), results, events: [], rejectionCode: "EFFECT_QUEUE_LIMIT" };
+      }
+    }
+    for (const threshold of transition.state.world.triggeredThresholds) {
+      if (!beforeThresholds.has(threshold)) newlyTriggeredThresholds.add(threshold);
+    }
+    if (
+      currentEffect.commandType === "RESTORE_WORLD"
+      && transition.result.ledgerDelta?.ledgerKind === "EFFECTIVE_WORLD_RESTORE"
+      && transition.result.ledgerDelta.amount > 0
+    ) {
+      lastEffectiveRestorePlayerId = transition.result.ledgerDelta.playerId;
+    }
+
+    let spawnedEffectIds: readonly string[] = [];
+    if (currentEffect.commandType === "DAMAGE_WORLD") {
+      const source = currentEffect.source;
+      const cardInstanceId = source.cardInstanceId;
+      const effective = transition.result.effective ?? 0;
+      if (
+        source.sourceKind === "CARD"
+        && (source.mode === "RELEASE" || source.mode === "RESPONSE")
+        && cardInstanceId
+        && effective > 0
+      ) {
+        const after25Triggered = transition.state.world.triggeredThresholds.includes(25);
+        if (!before25Triggered && after25Triggered) {
+          cardsCrossing25.add(cardInstanceId);
+        } else if (
+          before25Triggered
+          && !cardsCrossing25.has(cardInstanceId)
+          && !fragileDamageCards.has(cardInstanceId)
+          && source.ownerPlayerId
+          && working.world.triggeredThresholds.includes(25)
+          && !newlyTriggeredThresholds.has(25)
+        ) {
+          const fragileEffect: EffectCommand = {
+            effectId: generatedEffectId("fragile-world"),
+            commandType: "DAMAGE_PLAYER",
+            source: worldLawSource(working),
+            target: { targetKind: "PLAYER", playerId: source.ownerPlayerId },
+            payload: { amount: 2, damageKind: "FRAGILE_WORLD" },
+            attributionPolicy: "NO_LEDGER",
+            executionTiming: "IMMEDIATE",
+          };
+          effectBudgetUsed += 1;
+          if (effectBudgetUsed > state.ruleset.maxEffectsPerResolution) {
+            return { committed: false, state: invalidMatchState(state), results, events: [], rejectionCode: "EFFECT_QUEUE_LIMIT" };
+          }
+          pendingFragileSelfDamage = { cardInstanceId, effect: fragileEffect };
+          spawnedEffectIds = [fragileEffect.effectId];
+          fragileDamageCards.add(cardInstanceId);
+        }
+      }
+    }
+
+    usedIds.add(currentEffect.effectId);
+    working = { ...transition.state, effectQueue: queue.slice(index + 1) };
+    results.push({ ...transition.result, spawnedEffectIds });
     events.push(...transition.events);
+    index += 1;
+  }
+
+  const applyGenerated = (
+    generatedEffect: EffectCommand,
+    details: Record<string, Scalar> | ((generatedResult: EffectExecutionResult) => Record<string, Scalar>),
+    stateTransform: (currentState: GameState) => GameState = (currentState) => currentState,
+  ): { ok: true } | { ok: false; rejectionCode: EffectRejectionCode } => {
+    if (effectBudgetUsed >= state.ruleset.maxEffectsPerResolution) return { ok: false, rejectionCode: "EFFECT_QUEUE_LIMIT" };
+    effectBudgetUsed += 1;
+    const generatedTransition = applyEffect(working, generatedEffect, usedIds);
+    if (generatedTransition.result.status === "REJECTED" || generatedTransition.result.status === "INVALID_MATCH") {
+      return { ok: false, rejectionCode: generatedTransition.result.rejectionCode ?? "EFFECT_STATE_INCONSISTENT" };
+    }
+    const resolvedDetails = typeof details === "function" ? details(generatedTransition.result) : details;
+    const decorated = annotateWorldLawTransition(generatedTransition, generatedEffect, resolvedDetails);
+    usedIds.add(generatedEffect.effectId);
+    working = { ...stateTransform(decorated.state), effectQueue: [] };
+    results.push(decorated.result);
+    events.push(...decorated.events);
+    return { ok: true };
+  };
+
+  for (const threshold of state.ruleset.worldThresholds) {
+    if (!newlyTriggeredThresholds.has(threshold)) continue;
+    if (threshold === 75) {
+      const responsibilities = state.initialPlayerOrder.map((playerId) => working.players[playerId].worldDamageResponsibility);
+      const highest = Math.max(...responsibilities);
+      const targets = highest > 0
+        ? state.initialPlayerOrder.filter((playerId) => working.players[playerId].worldDamageResponsibility === highest)
+        : [];
+      const penalty = targets.length === 1 ? 2 : targets.length > 1 ? 1 : 0;
+      if (targets.length === 0) {
+        const generated = worldLawRevealEffect(working, generatedEffectId("world-law"), 75);
+        const applied = applyGenerated(generated, { threshold: 75, targetPlayerId: null, penalty: 0 });
+        if (!applied.ok) return { committed: false, state: invalidMatchState(state), results, events: [], rejectionCode: applied.rejectionCode };
+      } else {
+        for (const playerId of targets) {
+          const generated: EffectCommand = {
+            effectId: generatedEffectId("world-law"),
+            commandType: "MODIFY_NEXT_ACTION",
+            source: worldLawSource(working),
+            target: { targetKind: "PLAYER", playerId },
+            payload: { stat: "INCOMING_DAMAGE_REDUCTION", delta: -penalty, consumeWhen: "NEXT_DEFENSE_CARD" },
+            attributionPolicy: "NO_LEDGER",
+            executionTiming: "WORLD_LAW_PHASE",
+          };
+          const applied = applyGenerated(generated, { threshold: 75, targetPlayerId: playerId, penalty });
+          if (!applied.ok) return { committed: false, state: invalidMatchState(state), results, events: [], rejectionCode: applied.rejectionCode };
+        }
+      }
+    }
+
+    if (threshold === 50) {
+      if (lastEffectiveRestorePlayerId) {
+        const generated: EffectCommand = {
+          effectId: generatedEffectId("world-law"),
+          commandType: "DRAW_CARD",
+          source: worldLawSource(working),
+          target: { targetKind: "PLAYER", playerId: lastEffectiveRestorePlayerId },
+          payload: { count: 1, reason: "WORLD_LAW_50" },
+          attributionPolicy: "NO_LEDGER",
+          executionTiming: "WORLD_LAW_PHASE",
+        };
+        const applied = applyGenerated(generated, (generatedResult) => ({
+          threshold: 50,
+          targetPlayerId: lastEffectiveRestorePlayerId,
+          draw: generatedResult.effective ?? 0,
+        }));
+        if (!applied.ok) return { committed: false, state: invalidMatchState(state), results, events: [], rejectionCode: applied.rejectionCode };
+      } else {
+        const generated = worldLawRevealEffect(working, generatedEffectId("world-law"), 50);
+        const applied = applyGenerated(generated, { threshold: 50, targetPlayerId: null, draw: 0 });
+        if (!applied.ok) return { committed: false, state: invalidMatchState(state), results, events: [], rejectionCode: applied.rejectionCode };
+      }
+    }
+
+    if (threshold === 25) {
+      const generated = worldLawRevealEffect(working, generatedEffectId("world-law"), 25);
+      const applied = applyGenerated(generated, { threshold: 25, targetPlayerId: null }, activateFragileWorld);
+      if (!applied.ok) return { committed: false, state: invalidMatchState(state), results, events: [], rejectionCode: applied.rejectionCode };
+    }
+  }
+
+  const beforeTerminal = working;
+  working = finalizeTerminalState(working);
+  if (working !== beforeTerminal) {
+    const terminalEffect: EffectCommand = {
+      effectId: "effect.terminal.0001",
+      commandType: "REVEAL_PUBLIC_INFORMATION",
+      source: { sourceKind: "SYSTEM", ownerPlayerId: null, mode: "SYSTEM" },
+      target: { targetKind: "PUBLIC_INFORMATION" },
+      payload: { informationKind: "MATCH_FINISHED" },
+      attributionPolicy: "NO_LEDGER",
+      executionTiming: "TERMINAL_PHASE",
+    };
+    if (!beforeTerminal.terminalFlags.worldCollapsed && working.terminalFlags.worldCollapsed) {
+      events.push(event(terminalEffect, "WORLD_COLLAPSED", { worldDurability: 0 }));
+    }
+    if (working.judgment) events.push(event(terminalEffect, "JUDGMENT_COMPUTED", { winnerId: working.judgment.winnerId }));
+    events.push(event(terminalEffect, "MATCH_FINISHED", { endKind: working.terminalFlags.endKind }));
   }
   working = { ...working, effectQueue: [] };
   assertGameState(working);

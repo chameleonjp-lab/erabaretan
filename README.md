@@ -28,6 +28,7 @@
 - [決定的乱数生成器と固定試験値 V1](docs/20_DETERMINISTIC_RNG_AND_FIXED_VECTORS_V1.md)
 - [ゴールデン試合と最終状態ハッシュ V1](docs/21_GOLDEN_MATCHES_AND_STATE_HASHES_V1.md)
 - [game-core state / command基盤 V1](docs/22_GAME_CORE_STATE_AND_COMMAND_BASE_V1.md)
+- [game-core effects / PAY_HP V1](docs/23_GAME_CORE_EFFECTS_PAY_HP_V1.md)
 
 ### レビュー
 
@@ -43,7 +44,7 @@
 
 ## 現在の段階
 
-P1-01のgame-core基盤実装段階です。
+P1-02のgame-core効果解決実装段階です。
 
 P0-01として、[初期12種類カード仕様 V1](docs/16_INITIAL_12_CARD_SPEC_V1.md)を作成しました。カードの最終バランスではなく、12種類で中心体験を検証するための正本です。
 
@@ -59,6 +60,8 @@ P0-06として、[ゴールデン試合と最終状態ハッシュ V1](docs/21_G
 
 P1-01として、[game-core state / command基盤 V1](docs/22_GAME_CORE_STATE_AND_COMMAND_BASE_V1.md)を実装しました。画面・通信・保存・時刻・乱数に依存しないGameState、7種類のcommand型、validation、revision、再送防止、基礎状態遷移を固定しています。
 
+P1-02として、[game-core effects / PAY_HP V1](docs/23_GAME_CORE_EFFECTS_PAY_HP_V1.md)を実装しました。16種類の効果命令、原子的な効果キュー、盾・反射・世界耐久の基礎処理、`PAY_HP`、初期12枚の効果ビルダーを固定しています。
+
 ゲームエンジニアレビューにより、次を初期ルールとして固定しました。
 
 - カード補充は手番開始時
@@ -70,10 +73,10 @@ P1-01として、[game-core state / command基盤 V1](docs/22_GAME_CORE_STATE_AN
 - 同時死亡、世界0、最大ラウンド、降参、切断の扱い
 - 決定的な乱数、リプレイ、秘密情報、ルール版固定の方針
 
-P0-01、P0-02、P0-03、P0-04、P0-05、P0-06、P1-01は完了しました。次の実装作業は次のとおりです。
+P0-01、P0-02、P0-03、P0-04、P0-05、P0-06、P1-01、P1-02は完了しました。次の実装作業は次のとおりです。
 
-1. P1-02：effects / PAY_HP
+1. P1-03：thresholds / scoring
 
-P1-01のstate / command境界を使って、12種類のカード効果と`PAY_HP`を純粋な解決処理へ追加します。
+P1-02の効果解決境界を使って、世界境界、フィールド自動効果、カード条件、終了判定、採点を純粋な処理へ追加します。
 
 通信機能からは作りません。面白さ、採点の納得感、決定的な再現性を確認した後、24種類のオフライン試作、36種類の完成品質確認版、合言葉オンライン対戦、48種類の限定公開版へ進みます。

@@ -67,6 +67,8 @@
 4. [共通効果命令の正式型](19_COMMON_EFFECT_COMMANDS_ALPHA_12_V1.md)
 5. [決定的乱数生成器と固定試験値](20_DETERMINISTIC_RNG_AND_FIXED_VECTORS_V1.md)
 6. [ゴールデン試合と最終状態ハッシュ](21_GOLDEN_MATCHES_AND_STATE_HASHES_V1.md)
+7. [game-core state / command基盤](22_GAME_CORE_STATE_AND_COMMAND_BASE_V1.md)
+8. [game-core effects / PAY_HP](23_GAME_CORE_EFFECTS_PAY_HP_V1.md)
 
 状態遷移、補充順、手札上限、命令受理、効果、世界境界、終了、採点、リプレイ、不変条件の詳細を扱う。
 
@@ -257,6 +259,8 @@ P0では次を揃える。
 
 **P1-01「純粋なstate / command基盤」は完了。**
 
+**P1-02「effects / PAY_HP」は完了。**
+
 正本：
 
 - [初期12種類カード仕様 V1](16_INITIAL_12_CARD_SPEC_V1.md)
@@ -266,5 +270,6 @@ P0では次を揃える。
 - [決定的乱数生成器と固定試験値 V1](20_DETERMINISTIC_RNG_AND_FIXED_VECTORS_V1.md)
 - [ゴールデン試合と最終状態ハッシュ V1](21_GOLDEN_MATCHES_AND_STATE_HASHES_V1.md)
 - [game-core state / command基盤 V1](22_GAME_CORE_STATE_AND_COMMAND_BASE_V1.md)
+- [game-core effects / PAY_HP V1](23_GAME_CORE_EFFECTS_PAY_HP_V1.md)
 
-次の作業は、P1-02「effects / PAY_HP」である。P1-01の`game-core` state / command基盤が完了したため、純粋な効果解決へ進める。
+次の作業は、P1-03「thresholds / scoring」である。P1-02の効果解決が完了したため、世界境界、フィールド自動効果、カード条件、終了判定、採点へ進める。

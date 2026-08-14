@@ -58,6 +58,8 @@ function createPlayer(input: InitialPlayerInput, ruleset: RulesetSnapshot): Play
     statusEffects: {
       nextDefensePenalty: input.nextDefensePenalty ?? 0,
       fragileWorld: input.fragileWorld ?? false,
+      shields: [],
+      statModifiers: [],
     },
   };
 }
@@ -121,7 +123,9 @@ export function createInitialGameState(input: CreateInitialGameStateInput): Game
     },
     activeField: null,
     pendingAction: null,
+    pendingAttack: null,
     effectQueue: [],
+    scoreModifiers: [],
     terminalFlags: {
       worldCollapsed: false,
       defeatedPlayerIds: [],

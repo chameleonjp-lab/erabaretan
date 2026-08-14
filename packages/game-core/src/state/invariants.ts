@@ -95,6 +95,26 @@ export function assertGameState(state: GameState): void {
     assertIntegerInRange(`${playerId}.effectiveWorldRestore`, player.effectiveWorldRestore, 0, Number.MAX_SAFE_INTEGER);
     assertIntegerInRange(`${playerId}.survivedRoundCount`, player.survivedRoundCount, 0, state.ruleset.maxRounds);
     assertIntegerInRange(`${playerId}.nextDefensePenalty`, player.statusEffects.nextDefensePenalty, 0, Number.MAX_SAFE_INTEGER);
+    for (const shield of player.statusEffects.shields) {
+      assertIntegerInRange(`${playerId}.shield.amount`, shield.amount, 1, 30);
+      if (shield.scope === "CURRENT_PENDING_ATTACK" && !shield.pendingAttackId) {
+        throw new Error(`${playerId} current-attack shield requires pendingAttackId`);
+      }
+      if (shield.scope !== "CURRENT_PENDING_ATTACK" && shield.pendingAttackId !== null) {
+        throw new Error(`${playerId} non-current shield cannot have pendingAttackId`);
+      }
+      if (shield.scope === "UNTIL_TURN_SEQUENCE") {
+        if (shield.expiresAfterTurnSequence === null || shield.expiresAfterTurnSequence <= state.turnSequence) {
+          throw new Error(`${playerId} temporary shield has an invalid expiry`);
+        }
+      }
+    }
+    for (const modifier of player.statusEffects.statModifiers) {
+      assertIntegerInRange(`${playerId}.statModifier.delta`, Math.abs(modifier.delta), 1, 30);
+      if (modifier.expiresAfterTurnSequence <= state.turnSequence) {
+        throw new Error(`${playerId} stat modifier has expired but is still present`);
+      }
+    }
     const hand = state.cardZones.hands[playerId];
     if (!hand) throw new Error(`missing cardZones hand for ${playerId}`);
     if (hand.length !== player.hand.length || hand.some((cardId, index) => cardId !== player.hand[index])) {
@@ -116,6 +136,31 @@ export function assertGameState(state: GameState): void {
   }
   if (state.effectQueue.length > state.ruleset.maxEffectsPerResolution) {
     throw new Error("effect queue exceeds the ruleset limit");
+  }
+  if (state.activeField !== null) {
+    if (!state.players[state.activeField.ownerPlayerId]) throw new Error("activeField owner is unknown");
+    if (state.activeField.expiresAfterTurnSequence <= state.turnSequence) {
+      throw new Error("activeField has expired but is still present");
+    }
+  }
+  if (state.pendingAttack !== null) {
+    if (state.pendingAttack.attackingPlayerId === state.pendingAttack.defendingPlayerId) {
+      throw new Error("pendingAttack must have different attacking and defending players");
+    }
+    if (!state.players[state.pendingAttack.attackingPlayerId] || !state.players[state.pendingAttack.defendingPlayerId]) {
+      throw new Error("pendingAttack contains an unknown player");
+    }
+    assertIntegerInRange("pendingAttack.baseDamage", state.pendingAttack.baseDamage, 1, 30);
+    assertIntegerInRange("pendingAttack.responseCount", state.pendingAttack.responseCount, 0, 1);
+    assertIntegerInRange("pendingAttack.incomingDamageReduction", state.pendingAttack.incomingDamageReduction, 0, 30);
+    assertIntegerInRange("pendingAttack.currentShield", state.pendingAttack.currentShield, 0, 30);
+    if (state.pendingAttack.effectiveDamage !== null) {
+      assertIntegerInRange("pendingAttack.effectiveDamage", state.pendingAttack.effectiveDamage, 0, 30);
+    }
+  }
+  for (const modifier of state.scoreModifiers) {
+    if (!state.players[modifier.playerId]) throw new Error("score modifier contains an unknown player");
+    assertIntegerInRange("scoreModifier.amount", modifier.amount, 1, 100);
   }
   if (state.phase === "RESPONSE_SELECTION") {
     if (!state.pendingAction || state.pendingAction.kind !== "RESPONSE_SELECTION") {

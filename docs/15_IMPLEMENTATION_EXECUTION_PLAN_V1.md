@@ -232,6 +232,10 @@ reduce(state, validatedCommand, rng)
   -> nextState + events + randomConsumption
 ```
 
+### 4.0 P1-01の完了
+
+[P1-01正本](22_GAME_CORE_STATE_AND_COMMAND_BASE_V1.md)として、GameState、7種類のcommand型、validation、revision、再送防止、RESOLUTION割り込み拒否、カードzoneを実装した。次はP1-02で効果キューと`PAY_HP`を追加する。
+
 ## 4.1 実装順
 
 1. GameStateと識別子
@@ -673,7 +677,7 @@ P0-04 共通効果命令型
 P0-05 決定的乱数・固定試験値
 P0-06 ゴールデン試合・状態ハッシュ
 
-P1-01 state / command
+P1-01 [state / command](22_GAME_CORE_STATE_AND_COMMAND_BASE_V1.md)
 P1-02 effects / PAY_HP
 P1-03 thresholds / scoring
 P1-04 rng / replay / hash
@@ -779,7 +783,7 @@ copiesInDeck
 
 **P0-06：ゴールデン試合3件と最終状態ハッシュを[正本](21_GOLDEN_MATCHES_AND_STATE_HASHES_V1.md)へ定義する。**
 
-P0完了判定後、P1-01からgame-core実装を開始する。
+P0完了判定後、P1-01からgame-core実装を開始した。P1-01完了後はP1-02へ進む。
 
 ---
 
@@ -798,4 +802,4 @@ P0完了判定後、P1-01からgame-core実装を開始する。
 
 以上をもって、企画レビューから実装計画への変換は完了とする。
 
-次のフェーズはレビュー追加ではなく、P1-01「純粋なstate / command基盤」へ進む。
+P1-01「純粋なstate / command基盤」は完了した。次のフェーズはP1-02「effects / PAY_HP」である。

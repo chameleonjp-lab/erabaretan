@@ -197,6 +197,20 @@ test("command validation rejects an opponent action and effect values from the c
   if (!clientEffect.ok) assert.equal(clientEffect.error.code, "INVALID_PAYLOAD");
 });
 
+test("state construction rejects a card whose owner does not match its hand", () => {
+  assert.throws(
+    () => makeState({
+      cardInstances: [
+        card("p1-steadfast-01", "attack.steadfast-strike.v1", "P2", "HAND", 1),
+        card("p1-rift-01", "attack.rift-pebble.v1", "P1", "HAND", 2),
+        card("p2-filler-01", "attack.steadfast-strike.v1", "P2", "HAND", 3),
+        card("draw-01", "attack.star-breaker.v1", "P1", "DRAW_PILE", 4),
+      ],
+    }),
+    /owned by P2/,
+  );
+});
+
 function stateOrThrow(state) {
   return state;
 }

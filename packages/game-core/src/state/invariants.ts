@@ -52,13 +52,28 @@ export function assertGameState(state: GameState): void {
   if (state.world.worldLawId !== state.ruleset.worldLawId) {
     throw new Error("world.worldLawId must match the ruleset");
   }
+  for (let index = 1; index < state.ruleset.worldThresholds.length; index += 1) {
+    if (state.ruleset.worldThresholds[index - 1] <= state.ruleset.worldThresholds[index]) {
+      throw new Error("ruleset.worldThresholds must be strictly descending");
+    }
+  }
   if (state.world.triggeredThresholds.some((threshold) => !state.ruleset.worldThresholds.includes(threshold))) {
     throw new Error("world.triggeredThresholds contains an unknown threshold");
   }
   if (new Set(state.world.triggeredThresholds).size !== state.world.triggeredThresholds.length) {
     throw new Error("world.triggeredThresholds must not contain duplicates");
   }
+  for (let index = 1; index < state.world.triggeredThresholds.length; index += 1) {
+    if (state.world.triggeredThresholds[index - 1] <= state.world.triggeredThresholds[index]) {
+      throw new Error("world.triggeredThresholds must preserve descending trigger order");
+    }
+  }
 
+  const playerIds = Object.keys(state.players);
+  const handPlayerIds = Object.keys(state.cardZones.hands);
+  if (handPlayerIds.length !== playerIds.length || handPlayerIds.some((playerId) => !state.players[playerId])) {
+    throw new Error("cardZones.hands must contain exactly the match players");
+  }
   const zoneGroups: readonly (readonly string[])[] = [
     state.cardZones.drawPile,
     state.cardZones.discardPile,
@@ -89,8 +104,15 @@ export function assertGameState(state: GameState): void {
   for (const [cardId, card] of Object.entries(state.cardInstances)) {
     if (card.cardInstanceId !== cardId) throw new Error(`card key mismatch: ${cardId}`);
     if (!state.players[card.ownerPlayerId]) throw new Error(`card ${cardId} has unknown owner`);
+    assertIntegerInRange(`${cardId}.drawOrder`, card.drawOrder, 0, Number.MAX_SAFE_INTEGER);
     const actualZone = findCardZone(state, cardId);
     if (actualZone !== card.zone) throw new Error(`card ${cardId} zone mismatch: ${card.zone} vs ${actualZone}`);
+    if (actualZone === "HAND") {
+      const holder = playerIds.find((playerId) => state.cardZones.hands[playerId].includes(cardId));
+      if (holder !== card.ownerPlayerId) {
+        throw new Error(`card ${cardId} is held by ${holder ?? "unknown"}, but owned by ${card.ownerPlayerId}`);
+      }
+    }
   }
   if (state.effectQueue.length > state.ruleset.maxEffectsPerResolution) {
     throw new Error("effect queue exceeds the ruleset limit");

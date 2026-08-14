@@ -100,7 +100,7 @@ ADD_SCORE_MODIFIER
 node --experimental-strip-types --test tests/game-core/*.test.mjs tests/content/*.test.mjs
 ```
 
-22テストが成功している。PAY_HPの分離、支払い不足時の原子性、盾と期限、世界耐久の実効値、カードの順序、反射の一回性、初期12枚の効果列を確認した。
+23テストが成功している。PAY_HPの分離、支払い不足時の原子性、盾と期限、世界耐久の実効値と責任帰属、カードの順序、反射の一回性、初期12枚の効果列を確認した。
 
 ## 5. 次段階
 

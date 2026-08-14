@@ -170,6 +170,11 @@ test("world damage and restoration record only effective ledger values", () => {
   ));
   state = damage.state;
   assert.equal(damage.result.effective, 7);
+  assert.deepEqual(damage.result.ledgerDelta, {
+    ledgerKind: "WORLD_DAMAGE_RESPONSIBILITY",
+    playerId: "P1",
+    amount: 7,
+  });
   assert.equal(state.world.durability, 72);
   assert.deepEqual(state.world.triggeredThresholds, [75]);
   assert.equal(state.players.P1.worldDamageResponsibility, 7);
@@ -182,9 +187,38 @@ test("world damage and restoration record only effective ledger values", () => {
     { source: { ...source("P2"), cardInstanceId: "p2-filler-01" } },
   ));
   assert.equal(restore.result.effective, 7);
+  assert.deepEqual(restore.result.ledgerDelta, {
+    ledgerKind: "EFFECTIVE_WORLD_RESTORE",
+    playerId: "P2",
+    amount: 7,
+  });
   assert.equal(restore.state.world.durability, 79);
   assert.equal(restore.state.players.P2.effectiveWorldRestore, 7);
   assert.deepEqual(restore.state.world.triggeredThresholds, [75]);
+});
+
+test("world effects honor NO_LEDGER and reject unknown hand owners without throwing", () => {
+  const state = makeState({ worldDurability: 90 });
+  const noLedger = applyEffect(state, effect(
+    "DAMAGE_WORLD",
+    { targetKind: "WORLD" },
+    { amount: 2, reason: "CARD_RESPONSE" },
+    "effect.resolution-0001.0002",
+    { attributionPolicy: "NO_LEDGER" },
+  ));
+  assert.equal(noLedger.result.status, "APPLIED");
+  assert.equal(noLedger.state.world.durability, 88);
+  assert.equal(noLedger.state.players.P1.worldDamageResponsibility, 0);
+  assert.equal(noLedger.result.ledgerDelta, undefined);
+
+  const invalidTarget = applyEffect(state, effect(
+    "DRAW_CARD",
+    { targetKind: "PLAYER", playerId: "P3" },
+    { count: 1, reason: "CARD_EFFECT" },
+  ));
+  assert.equal(invalidTarget.result.status, "REJECTED");
+  assert.equal(invalidTarget.result.rejectionCode, "EFFECT_BAD_TARGET");
+  assert.equal(invalidTarget.state, state);
 });
 
 test("draw and discard preserve card uniqueness and hand order", () => {

@@ -97,20 +97,29 @@ export function assertGameState(state: GameState): void {
     assertIntegerInRange(`${playerId}.nextDefensePenalty`, player.statusEffects.nextDefensePenalty, 0, Number.MAX_SAFE_INTEGER);
     for (const shield of player.statusEffects.shields) {
       assertIntegerInRange(`${playerId}.shield.amount`, shield.amount, 1, 30);
+      if (!["CURRENT_PENDING_ATTACK", "NEXT_APPLICABLE_ATTACK", "UNTIL_TURN_SEQUENCE"].includes(shield.scope)) {
+        throw new Error(`${playerId} shield has an unknown scope`);
+      }
       if (shield.scope === "CURRENT_PENDING_ATTACK" && !shield.pendingAttackId) {
         throw new Error(`${playerId} current-attack shield requires pendingAttackId`);
       }
       if (shield.scope !== "CURRENT_PENDING_ATTACK" && shield.pendingAttackId !== null) {
         throw new Error(`${playerId} non-current shield cannot have pendingAttackId`);
       }
-      if (shield.scope === "UNTIL_TURN_SEQUENCE") {
+      if (shield.scope === "CURRENT_PENDING_ATTACK" && shield.expiresAfterTurnSequence !== null) {
+        throw new Error(`${playerId} current-attack shield cannot have an expiry`);
+      }
+      if (shield.scope !== "CURRENT_PENDING_ATTACK") {
         if (shield.expiresAfterTurnSequence === null || shield.expiresAfterTurnSequence <= state.turnSequence) {
-          throw new Error(`${playerId} temporary shield has an invalid expiry`);
+          throw new Error(`${playerId} persistent shield has an invalid expiry`);
         }
       }
     }
     for (const modifier of player.statusEffects.statModifiers) {
       assertIntegerInRange(`${playerId}.statModifier.delta`, Math.abs(modifier.delta), 1, 30);
+      if (!["INCOMING_DAMAGE_REDUCTION", "ACTION_DAMAGE"].includes(modifier.stat)) {
+        throw new Error(`${playerId} stat modifier has an unknown stat`);
+      }
       if (modifier.expiresAfterTurnSequence <= state.turnSequence) {
         throw new Error(`${playerId} stat modifier has expired but is still present`);
       }

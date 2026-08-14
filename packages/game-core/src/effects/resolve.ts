@@ -83,6 +83,7 @@ function result(
     effective?: number;
     before?: Record<string, Scalar>;
     after?: Record<string, Scalar>;
+    ledgerDelta?: EffectExecutionResult["ledgerDelta"];
     rejectionCode?: EffectRejectionCode;
     eventTypes?: readonly string[];
   } = {},
@@ -95,6 +96,7 @@ function result(
     effective: values.effective,
     before: before(values.before),
     after: values.after,
+    ledgerDelta: values.ledgerDelta,
     rejectionCode: values.rejectionCode,
     spawnedEffectIds: [],
     eventTypes: values.eventTypes ?? [],
@@ -183,6 +185,7 @@ function validateEffectCommand(state: GameState, input: unknown): { ok: true; ef
   if ((type === "DAMAGE_WORLD" || type === "RESTORE_WORLD") && target.targetKind !== "WORLD") return { ok: false, code: "EFFECT_BAD_TARGET" };
   if (type === "REDUCE_INCOMING_DAMAGE" && target.targetKind !== "CURRENT_PENDING_ATTACK") return { ok: false, code: "EFFECT_BAD_TARGET" };
   if ((type === "DRAW_CARD" || type === "DISCARD_CARD") && !["PLAYER", "SELF_HAND"].includes(target.targetKind)) return { ok: false, code: "EFFECT_BAD_TARGET" };
+  if ((type === "DRAW_CARD" || type === "DISCARD_CARD") && !state.players[String(target.playerId)]) return { ok: false, code: "EFFECT_BAD_TARGET" };
   if ((type === "SET_FIELD" || type === "CLEAR_FIELD") && target.targetKind !== "CURRENT_FIELD") return { ok: false, code: "EFFECT_BAD_TARGET" };
   if (type === "REVEAL_PUBLIC_INFORMATION" && target.targetKind !== "PUBLIC_INFORMATION") return { ok: false, code: "EFFECT_BAD_TARGET" };
   if (type === "ADD_SCORE_MODIFIER" && target.targetKind !== "SCORE_LEDGER") return { ok: false, code: "EFFECT_BAD_TARGET" };
@@ -221,6 +224,7 @@ function validateEffectCommand(state: GameState, input: unknown): { ok: true; ef
   if (type === "REFLECT_DAMAGE" && typeof target.playerId !== "string") return { ok: false, code: "EFFECT_BAD_TARGET" };
   if (type === "DAMAGE_PLAYER" && !["DIRECT", "REFLECTION", "FRAGILE_WORLD", "WORLD_LAW"].includes(String(payload.damageKind))) return { ok: false, code: "EFFECT_MISSING_FIELD" };
   if (type === "ADD_SHIELD" && !["CURRENT_PENDING_ATTACK", "NEXT_APPLICABLE_ATTACK", "UNTIL_TURN_SEQUENCE"].includes(String(payload.scope))) return { ok: false, code: "EFFECT_MISSING_FIELD" };
+  if (type === "ADD_SHIELD" && payload.scope !== "CURRENT_PENDING_ATTACK" && target.targetKind !== "PLAYER") return { ok: false, code: "EFFECT_BAD_TARGET" };
   if (type === "DRAW_CARD" && !["NORMAL_REFILL", "WORLD_LAW_50", "CARD_EFFECT"].includes(String(payload.reason))) return { ok: false, code: "EFFECT_MISSING_FIELD" };
   if (type === "DISCARD_CARD" && (![
     "EXPLICIT_CARD_INSTANCE",
@@ -357,7 +361,7 @@ function applyAddShield(state: GameState, effect: EffectCommand, payload: AddShi
       events: effective ? [event(effect, "SHIELD_ADDED", { playerId, amount: effective })] : [],
     };
   }
-  const currentShields = player.statusEffects.shields.filter((shield) => shield.scope !== "UNTIL_TURN_SEQUENCE" || (shield.expiresAfterTurnSequence ?? 0) > state.turnSequence);
+  const currentShields = player.statusEffects.shields.filter((shield) => shield.scope === "CURRENT_PENDING_ATTACK" || (shield.expiresAfterTurnSequence ?? 0) > state.turnSequence);
   const used = currentShields.reduce((sum, shield) => sum + shield.amount, 0);
   const effective = Math.min(payload.amount, 30 - used);
   if (effective === 0) {
@@ -369,7 +373,7 @@ function applyAddShield(state: GameState, effect: EffectCommand, payload: AddShi
     pendingAttackId: null,
     expiresAfterTurnSequence: payload.expiresAfterTurnSequence ?? null,
   };
-  const nextState = updatePlayer(state, playerId, (current) => ({ ...current, statusEffects: { ...current.statusEffects, shields: [...current.statusEffects.shields, shield] } }));
+  const nextState = updatePlayer(state, playerId, (current) => ({ ...current, statusEffects: { ...current.statusEffects, shields: [...currentShields, shield] } }));
   return {
     state: nextState,
     result: result(effect, "APPLIED", { requested: payload.amount, effective, before: { shield: used }, after: { shield: used + effective }, eventTypes: ["SHIELD_ADDED"] }),
@@ -434,7 +438,8 @@ function applyDiscardCard(state: GameState, effect: EffectCommand, payload: Disc
 
 function applyDamageWorld(state: GameState, effect: EffectCommand, payload: DamageWorldPayload) {
   const owner = effect.source.ownerPlayerId;
-  if (!owner) return reject(effect, "EFFECT_BAD_SOURCE");
+  const recordsPlayerLedger = effect.attributionPolicy === "SOURCE_OWNER" || effect.attributionPolicy === "ORIGINAL_CARD_OWNER";
+  if (recordsPlayerLedger && !owner) return reject(effect, "EFFECT_BAD_SOURCE");
   const beforeDurability = state.world.durability;
   const effective = Math.min(payload.amount, beforeDurability);
   const afterDurability = beforeDurability - effective;
@@ -442,32 +447,39 @@ function applyDamageWorld(state: GameState, effect: EffectCommand, payload: Dama
   for (const threshold of state.ruleset.worldThresholds) {
     if (beforeDurability > threshold && afterDurability <= threshold && !triggered.includes(threshold)) triggered.push(threshold);
   }
-  const nextState = updatePlayer({
+  const worldState: GameState = {
     ...state,
     world: {
       ...state.world,
       durability: afterDurability,
       triggeredThresholds: triggered,
-      collapseResponsiblePlayerId: afterDurability === 0 && beforeDurability > 0 ? owner : state.world.collapseResponsiblePlayerId,
+      collapseResponsiblePlayerId: afterDurability === 0 && beforeDurability > 0 && recordsPlayerLedger ? owner : state.world.collapseResponsiblePlayerId,
     },
-  }, owner, (player) => ({ ...player, worldDamageResponsibility: player.worldDamageResponsibility + effective }));
+  };
+  const nextState = recordsPlayerLedger && owner
+    ? updatePlayer(worldState, owner, (player) => ({ ...player, worldDamageResponsibility: player.worldDamageResponsibility + effective }))
+    : worldState;
   const eventTypes = ["DAMAGE_WORLD_APPLIED", ...triggered.filter((threshold) => !state.world.triggeredThresholds.includes(threshold)).map(() => "WORLD_THRESHOLD_TRIGGERED")];
   return {
     state: nextState,
-    result: result(effect, effective === 0 ? "NO_OP" : "APPLIED", { requested: payload.amount, effective, before: { worldDurability: beforeDurability }, after: { worldDurability: afterDurability }, eventTypes }),
+    result: result(effect, effective === 0 ? "NO_OP" : "APPLIED", { requested: payload.amount, effective, before: { worldDurability: beforeDurability }, after: { worldDurability: afterDurability }, ledgerDelta: recordsPlayerLedger && owner ? { ledgerKind: "WORLD_DAMAGE_RESPONSIBILITY", playerId: owner, amount: effective } : undefined, eventTypes }),
     events: [event(effect, "DAMAGE_WORLD_APPLIED", { ownerPlayerId: owner, requested: payload.amount, effective }), ...triggered.filter((threshold) => !state.world.triggeredThresholds.includes(threshold)).map((threshold) => event(effect, "WORLD_THRESHOLD_TRIGGERED", { threshold }))],
   };
 }
 
 function applyRestoreWorld(state: GameState, effect: EffectCommand, payload: RestoreWorldPayload) {
   const owner = effect.source.ownerPlayerId;
-  if (!owner) return reject(effect, "EFFECT_BAD_SOURCE");
+  const recordsPlayerLedger = effect.attributionPolicy === "SOURCE_OWNER" || effect.attributionPolicy === "ORIGINAL_CARD_OWNER";
+  if (recordsPlayerLedger && !owner) return reject(effect, "EFFECT_BAD_SOURCE");
   const beforeDurability = state.world.durability;
   const effective = Math.min(payload.amount, state.world.maxDurability - beforeDurability);
-  const nextState = updatePlayer({ ...state, world: { ...state.world, durability: beforeDurability + effective } }, owner, (player) => ({ ...player, effectiveWorldRestore: player.effectiveWorldRestore + effective }));
+  const worldState: GameState = { ...state, world: { ...state.world, durability: beforeDurability + effective } };
+  const nextState = recordsPlayerLedger && owner
+    ? updatePlayer(worldState, owner, (player) => ({ ...player, effectiveWorldRestore: player.effectiveWorldRestore + effective }))
+    : worldState;
   return {
     state: nextState,
-    result: result(effect, effective === 0 ? "NO_OP" : "APPLIED", { requested: payload.amount, effective, before: { worldDurability: beforeDurability }, after: { worldDurability: beforeDurability + effective }, eventTypes: effective ? ["RESTORE_WORLD_APPLIED"] : [] }),
+    result: result(effect, effective === 0 ? "NO_OP" : "APPLIED", { requested: payload.amount, effective, before: { worldDurability: beforeDurability }, after: { worldDurability: beforeDurability + effective }, ledgerDelta: recordsPlayerLedger && owner ? { ledgerKind: "EFFECTIVE_WORLD_RESTORE", playerId: owner, amount: effective } : undefined, eventTypes: effective ? ["RESTORE_WORLD_APPLIED"] : [] }),
     events: effective ? [event(effect, "RESTORE_WORLD_APPLIED", { ownerPlayerId: owner, requested: payload.amount, effective })] : [],
   };
 }

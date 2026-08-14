@@ -190,6 +190,12 @@ export type EffectRejectionCode =
   | "EFFECT_QUEUE_LIMIT"
   | "EFFECT_STATE_INCONSISTENT";
 
+export interface EffectLedgerDelta {
+  readonly ledgerKind: "WORLD_DAMAGE_RESPONSIBILITY" | "EFFECTIVE_WORLD_RESTORE";
+  readonly playerId: PlayerId;
+  readonly amount: number;
+}
+
 export interface EffectExecutionResult {
   readonly effectId: string;
   readonly commandType: EffectCommandType;
@@ -198,6 +204,7 @@ export interface EffectExecutionResult {
   readonly effective?: number;
   readonly before: Readonly<Record<string, number | string | boolean | null>>;
   readonly after?: Readonly<Record<string, number | string | boolean | null>>;
+  readonly ledgerDelta?: EffectLedgerDelta;
   readonly rejectionCode?: EffectRejectionCode;
   readonly spawnedEffectIds: readonly string[];
   readonly eventTypes: readonly string[];

@@ -12,6 +12,7 @@ import type {
 import { assertGameState } from "./state/invariants.ts";
 import type { Command } from "./commands/types.ts";
 import { validateCommand } from "./commands/validate.ts";
+import type { CommandValidationOptions } from "./commands/validate.ts";
 
 export type CommandResult =
   | {
@@ -247,8 +248,8 @@ function answerResponse(
   };
 }
 
-export function applyCommand(state: GameState, input: unknown): CommandResult {
-  const validation = validateCommand(state, input);
+export function applyCommand(state: GameState, input: unknown, options: CommandValidationOptions = {}): CommandResult {
+  const validation = validateCommand(state, input, options);
   if (!validation.ok) {
     const commandId = validation.error.commandId;
     return {

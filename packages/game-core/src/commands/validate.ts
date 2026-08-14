@@ -1,4 +1,4 @@
-import type { GameState, PlayerId } from "../state/types.ts";
+import type { GameState, PlayMode, PlayerId } from "../state/types.ts";
 import type { Command, CommandType, EmptyPayload } from "./types.ts";
 
 export type CommandRejectionCode =
@@ -17,6 +17,7 @@ export type CommandRejectionCode =
   | "CARD_NOT_IN_HAND"
   | "UNKNOWN_CARD_INSTANCE"
   | "INVALID_TARGET"
+  | "CARD_CONDITION_NOT_MET"
   | "MATCH_FINISHED"
   | "RESOLUTION_IN_PROGRESS";
 
@@ -36,6 +37,20 @@ export type ValidationResult =
   | { readonly ok: true; readonly kind: "NEW"; readonly command: Command }
   | { readonly ok: true; readonly kind: "REPLAY"; readonly replay: CommandHistoryReplay }
   | { readonly ok: false; readonly error: CommandRejection };
+
+export interface CardConditionValidationInput {
+  readonly state: GameState;
+  readonly playerId: PlayerId;
+  readonly cardInstanceId: string;
+  readonly mode: PlayMode | "RESPONSE";
+  readonly targetPlayerId?: PlayerId | null;
+}
+
+export interface CommandValidationOptions {
+  readonly cardConditionValidator?: (input: CardConditionValidationInput) =>
+    | { readonly ok: true }
+    | { readonly ok: false; readonly code: "INVALID_TARGET" | "CARD_CONDITION_NOT_MET"; readonly message: string };
+}
 
 const COMMAND_TYPES: readonly CommandType[] = [
   "PLAY_CARD",
@@ -116,7 +131,7 @@ function commandPhaseAllowed(state: GameState, commandType: CommandType, playerI
   return rejection("COMMAND_NOT_ALLOWED_IN_PHASE", `${commandType} is not allowed in ${state.phase}`, null);
 }
 
-export function validateCommand(state: GameState, input: unknown): ValidationResult {
+export function validateCommand(state: GameState, input: unknown, options: CommandValidationOptions = {}): ValidationResult {
   if (!isRecord(input)) return rejection("MALFORMED_COMMAND", "command must be a JSON object");
 
   const commandId = typeof input.commandId === "string" ? input.commandId : null;
@@ -168,6 +183,16 @@ export function validateCommand(state: GameState, input: unknown): ValidationRes
     if (!state.cardZones.hands[input.playerId].includes(payload.cardInstanceId)) {
       return rejection("CARD_NOT_IN_HAND", "cardInstanceId is not in the player's hand", input.commandId);
     }
+    if (options.cardConditionValidator) {
+      const condition = options.cardConditionValidator({
+        state,
+        playerId: input.playerId,
+        cardInstanceId: payload.cardInstanceId,
+        mode: payload.playMode,
+        targetPlayerId: payload.targetPlayerId ?? null,
+      });
+      if (!condition.ok) return rejection(condition.code, condition.message, input.commandId);
+    }
     return { ok: true, kind: "NEW", command: { ...input, payload: { ...payload } } as Command };
   }
 
@@ -193,6 +218,15 @@ export function validateCommand(state: GameState, input: unknown): ValidationRes
     }
     if (!state.cardZones.hands[input.playerId].includes(payload.cardInstanceId)) {
       return rejection("CARD_NOT_IN_HAND", "cardInstanceId is not in the player's hand", input.commandId);
+    }
+    if (options.cardConditionValidator) {
+      const condition = options.cardConditionValidator({
+        state,
+        playerId: input.playerId,
+        cardInstanceId: payload.cardInstanceId,
+        mode: "RESPONSE",
+      });
+      if (!condition.ok) return rejection(condition.code, condition.message, input.commandId);
     }
     return { ok: true, kind: "NEW", command: { ...input, payload: { ...payload } } as Command };
   }

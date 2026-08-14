@@ -151,6 +151,12 @@ export function assertGameState(state: GameState): void {
     if (state.activeField.expiresAfterTurnSequence <= state.turnSequence) {
       throw new Error("activeField has expired but is still present");
     }
+    if (state.activeField.rootSanctuaryUsedTurnSequence !== null) {
+      assertIntegerInRange("activeField.rootSanctuaryUsedTurnSequence", state.activeField.rootSanctuaryUsedTurnSequence, 1, Number.MAX_SAFE_INTEGER);
+    }
+    if (state.activeField.lastFrenziedCardInstanceId !== null && !state.cardInstances[state.activeField.lastFrenziedCardInstanceId]) {
+      throw new Error("activeField.lastFrenziedCardInstanceId is unknown");
+    }
   }
   if (state.pendingAttack !== null) {
     if (state.pendingAttack.attackingPlayerId === state.pendingAttack.defendingPlayerId) {
@@ -160,7 +166,7 @@ export function assertGameState(state: GameState): void {
       throw new Error("pendingAttack contains an unknown player");
     }
     assertIntegerInRange("pendingAttack.baseDamage", state.pendingAttack.baseDamage, 1, 30);
-    assertIntegerInRange("pendingAttack.responseCount", state.pendingAttack.responseCount, 0, 1);
+    assertIntegerInRange("pendingAttack.responseCount", state.pendingAttack.responseCount, 0, state.ruleset.maxResponsesPerAttack ?? 1);
     assertIntegerInRange("pendingAttack.incomingDamageReduction", state.pendingAttack.incomingDamageReduction, 0, 30);
     assertIntegerInRange("pendingAttack.currentShield", state.pendingAttack.currentShield, 0, 30);
     if (state.pendingAttack.effectiveDamage !== null) {

@@ -58,6 +58,9 @@ export interface RulesetSnapshot {
   readonly maxRounds: number;
   readonly startingHand: number;
   readonly handLimit: number;
+  readonly fieldDefinitionIds?: readonly CardDefinitionId[];
+  readonly maxActiveFields?: number;
+  readonly maxResponsesPerAttack?: number;
   readonly maxEffectsPerResolution: number;
   readonly survivalRoundScore: number;
   readonly survivalBonus: number;
@@ -112,6 +115,10 @@ export interface ActiveFieldState {
   readonly fieldDefinitionId: CardDefinitionId;
   readonly ownerPlayerId: PlayerId;
   readonly expiresAfterTurnSequence: number;
+  /** The last card instance that received the frenzied-fracture +1 modifier. */
+  readonly lastFrenziedCardInstanceId: CardInstanceId | null;
+  /** The turnSequence whose first world-damage request used root-sanctuary. */
+  readonly rootSanctuaryUsedTurnSequence: number | null;
 }
 
 export interface CardResolutionAction {

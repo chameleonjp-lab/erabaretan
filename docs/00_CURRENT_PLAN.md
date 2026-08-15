@@ -272,6 +272,8 @@ P0では次を揃える。
 
 **P1-05「公開状態投影・preview・summary」は完了。**
 
+**P2-01「Fixture A〜Fの契約試験」は完了。**
+
 正本：
 
 - [初期12種類カード仕様 V1](16_INITIAL_12_CARD_SPEC_V1.md)
@@ -285,4 +287,4 @@ P0では次を揃える。
 - [game-core world boundaries / terminal / scoring V1](24_GAME_CORE_WORLD_BOUNDARIES_TERMINAL_V1.md)
 - [game-core RNG / replay / state hash V1](25_GAME_CORE_RNG_REPLAY_HASH_V1.md)
 
-P1-03「thresholds / scoring」、P1-04「rng / replay / hash」、P1-04b「P0-06 golden manifest・実行境界・fixtureバイト列の訂正」、P1-05「projection / preview / summary」の実装は完了した。旧ハッシュ値は履歴として隔離し、現行manifestを正本付属データとして扱う。次はP2-01「basic fixtures」へ進む。
+P1-03「thresholds / scoring」、P1-04「rng / replay / hash」、P1-04b「P0-06 golden manifest・実行境界・fixtureバイト列の訂正」、P1-05「projection / preview / summary」、P2-01「basic fixtures」の実装は完了した。旧ハッシュ値は履歴として隔離し、現行manifestを正本付属データとして扱う。次はP2-02「adversarial fixtures」へ進む。

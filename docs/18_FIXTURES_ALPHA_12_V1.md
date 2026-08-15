@@ -1,7 +1,7 @@
 # エラバレタン：alpha-12 Fixture仕様 V1
 
-- 文書状態：P0-03 正本・実装前検証値
-- 更新日：2026-08-14
+- 文書状態：P2-01 実装契約・正本
+- 更新日：2026-08-15
 - fixtureSetId：fixture.alpha-12.v1
 - 対象rulesetId：ruleset.alpha-12.v1
 - 対象worldLawId：world-law.primordial-fracture.v1
@@ -852,3 +852,8 @@ Fixture F以外の途中状態では、画面に参考値を表示しても勝�
 - [x] 12種類のカードだけで作れない複数境界一括処理を、効果キュー単体試験として分離した。
 
 P0-03は完了とする。共通効果命令の正式な入力型と出力型はP0-04の正本で固定し、決定的乱数と初期山札の固定値はP0-05の正本で固定した。ゴールデン試合と最終状態ハッシュはP0-06の正本で固定した。次はP1-01「純粋なstate / command基盤」へ進む。
+
+
+## P2-01 実装記録
+
+Fixture A〜Fは、`tests/game-core/p2-01-fixtures.test.mjs`で自動化した。Aでは`resolveTurnStart`を通じて先攻初回の補充なし、後続手番の1枚補充、手札9枚、既存overflow、補充カードのowner/zone、revisionを検証する。B〜Eではalpha-12のproduction executorを通じて75・50・25境界、PAY_HP、応答再生、自己損傷の開始時点を検証し、Fでは通常撃破・戦闘勝者・神の選定者・72対2の採点を検証する。X01〜X14はP2-02以降の対象として変更しない。

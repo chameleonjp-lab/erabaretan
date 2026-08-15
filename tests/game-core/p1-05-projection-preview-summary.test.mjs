@@ -394,4 +394,14 @@ test("non-normal summaries do not award score or divine selection", () => {
     terminalFlags: { ...result.state.terminalFlags, battleWinnerId: null },
   };
   assert.deepEqual(summarizeMatch(invalidWinner), { ok: false, code: "TERMINAL_STATE_INCONSISTENT" });
+  const invalidWorldFlag = {
+    ...result.state,
+    terminalFlags: { ...result.state.terminalFlags, worldCollapsed: true },
+  };
+  assert.deepEqual(summarizeMatch(invalidWorldFlag), { ok: false, code: "TERMINAL_STATE_INCONSISTENT" });
+  const invalidRoundFlag = {
+    ...result.state,
+    terminalFlags: { ...result.state.terminalFlags, maxRoundsReached: true },
+  };
+  assert.deepEqual(summarizeMatch(invalidRoundFlag), { ok: false, code: "TERMINAL_STATE_INCONSISTENT" });
 });

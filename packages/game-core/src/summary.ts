@@ -84,14 +84,14 @@ function terminalStateConsistent(state: GameState): boolean {
   if (flags.divineSelectionWinnerId !== null && !state.initialPlayerOrder.includes(flags.divineSelectionWinnerId)) return false;
   if (state.activePlayerId !== null || state.respondingPlayerId !== null) return false;
   if (state.pendingAction !== null || state.pendingAttack !== null || state.effectQueue.length !== 0) return false;
+  if (flags.worldCollapsed !== (state.world.durability === 0)) return false;
+  if (flags.maxRoundsReached !== (state.roundNumber > state.ruleset.maxRounds)) return false;
 
   if (flags.endKind === "NORMAL") {
     const defeatedByHp = state.initialPlayerOrder.filter((playerId) => state.players[playerId].hitPoints <= 0);
     const alive = state.initialPlayerOrder.filter((playerId) => !flags.defeatedPlayerIds.includes(playerId));
     const expectedBattleWinner = alive.length === 1 ? alive[0] : null;
-    return flags.worldCollapsed === (state.world.durability === 0)
-      && flags.maxRoundsReached === (state.roundNumber > state.ruleset.maxRounds)
-      && flags.defeatedPlayerIds.length === defeatedByHp.length
+    return flags.defeatedPlayerIds.length === defeatedByHp.length
       && flags.defeatedPlayerIds.every((playerId, index) => playerId === defeatedByHp[index])
       && flags.battleWinnerId === expectedBattleWinner;
   }

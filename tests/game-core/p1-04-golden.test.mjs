@@ -17,7 +17,9 @@ function standardSha256(value) {
 }
 
 function storedHashInput(name) {
-  return readFileSync(new URL(`../fixtures/golden-alpha-12/${name}-state-hash-input.json`, import.meta.url), "utf8").trim();
+  const content = readFileSync(new URL(`../fixtures/golden-alpha-12/${name}-state-hash-input.json`, import.meta.url), "utf8");
+  assert.equal(content.endsWith("\n"), false, `${name} hash input fixture must not end with a newline`);
+  return content;
 }
 
 const goldenManifest = JSON.parse(readFileSync(new URL("../fixtures/golden-alpha-12/golden-manifest.json", import.meta.url), "utf8"));

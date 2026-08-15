@@ -265,7 +265,9 @@ P0では次を揃える。
 
 **P1-03「thresholds / scoring」は完了。**
 
-**P1-04「rng / replay / hash」の決定性基盤実装は完了。P0-06旧ハッシュ値との整合は未解決の契約差分として別作業に切り出した。**
+**P1-04「rng / replay / hash」の決定性基盤実装は完了。P0-06は実装整合訂正版を反映し、旧ハッシュ値を履歴として隔離した。**
+
+**P1-04b「P0-06 golden manifest・実行境界・fixtureバイト列の訂正」は完了。**
 
 正本：
 
@@ -280,4 +282,4 @@ P0では次を揃える。
 - [game-core world boundaries / terminal / scoring V1](24_GAME_CORE_WORLD_BOUNDARIES_TERMINAL_V1.md)
 - [game-core RNG / replay / state hash V1](25_GAME_CORE_RNG_REPLAY_HASH_V1.md)
 
-P1-03「thresholds / scoring」とP1-04「rng / replay / hash」の決定性基盤実装は完了した。P0-06旧ハッシュ値との整合は、生成元JSONが未保存のため別作業として訂正する。次にP1-04bでその入力を再固定し、完了後にP1-05「projection / preview / summary」へ進む。
+P1-03「thresholds / scoring」、P1-04「rng / replay / hash」、P1-04b「P0-06 golden manifest・実行境界・fixtureバイト列の訂正」の決定性基盤実装は完了した。旧ハッシュ値は履歴として隔離し、現行manifestを正本付属データとして扱う。次はP1-05「projection / preview / summary」へ進む。

@@ -1,6 +1,6 @@
 # エラバレタン：P1-04 game-core 乱数・リプレイ・状態ハッシュ実装記録 V1
 
-- 文書状態：P1-04 実装記録
+- 文書状態：P1-04 / P1-04b 実装・訂正記録
 - 更新日：2026-08-15
 - 対象rulesetId：`ruleset.alpha-12.v1`
 - 関連正本：[決定的乱数生成器と固定試験値 V1](20_DETERMINISTIC_RNG_AND_FIXED_VECTORS_V1.md)
@@ -49,18 +49,20 @@ P1-04では、画面、通信、保存先へ依存しない決定性の基礎を
 - 各revisionのrevision番号、乱数消費数、状態ハッシュを必須配列として検証し、途中で不一致になった時点で失敗
 - G02/G03の内部効果キューを公開commandとして受け付ける機能は追加しない
 
-## 3. P0-06旧ハッシュ値との整合
+## 3. P0-06実装整合訂正
 
-P0-06正本に記載されたG01〜G03の旧ハッシュ値は、生成元の完全な正規化JSONとrevision別入力がリポジトリへ保存されていないため、今回の実装で再現できなかった。旧値は履歴上の値として保持し、現行実装へ合わせるためのassertionには使わない。
+P0-06正本の旧G01〜G03ハッシュ値は、生成元の完全な正規化JSONとrevision別入力が保存されていないため現行実装から再現できない。旧値はdocs/21の履歴欄へ隔離し、現行実装のassertionには使わない。
 
-現行の`state-hash.alpha-12.v1`が実際にハッシュする完全な正規化JSONは、次のfixtureとして保存した。
+`state-hash.alpha-12.v1`の投影、正規化規則、バージョンは維持する。現行の完全な正規化JSONと実行証拠は、次のfixtureとmanifestを機械検査用の正本付属データとして扱う。
 
 - `tests/fixtures/golden-alpha-12/g01-state-hash-input.json`
 - `tests/fixtures/golden-alpha-12/g02-state-hash-input.json`
 - `tests/fixtures/golden-alpha-12/g03-state-hash-input.json`
 - `tests/fixtures/golden-alpha-12/golden-manifest.json`
 
-これらには現行GameStateの重要な状態、revision、イベント境界に対応する入力が含まれる。G01は本番command pipeline、G02/G03は`resolveEffectQueue`を直接呼ぶ内部ハーネスであり、後者は`COMMAND_ACCEPTED`を生成せずrevision 1のまま進む境界をmanifestへ明記した。旧ハッシュ値へ合わせるために、現行状態モデルから情報を削る実装は採用しない。P1-05へ進む前に、P0-06の完全な入力JSON・revision別ハッシュ・イベント列を再固定し、旧版V1を維持するか`state-hash.alpha-12.v2`へ移行するかを別作業で決める。
+G01は`executeAlpha12Command`を通る本番command pipelineで、revision 0→1→2、`COMMAND_ACCEPTED`は2件である。G02/G03は`resolveEffectQueue`を直接呼ぶ内部ハーネスで、revision 1→1、`COMMAND_ACCEPTED`なしである。docs/21とmanifestが食い違った場合は試験失敗とし、片方だけを変更しない。
+
+3件のstate-hash input JSONは、`serializeStateForHash`の出力と同じUTF-8バイト列として保存し、末尾の改行を含めない。試験はtrimで改行を吸収せず、ファイルバイト列とハッシュ入力の一致を検査する。旧値へ合わせるために状態モデルから情報を削る実装は採用しない。
 
 ## 4. 試験結果
 
@@ -75,7 +77,7 @@ TypeScript typecheck passed
 
 ## 5. 次の作業
 
-P1-04の決定性基盤と本番相当リプレイは実装済みである。P0-06旧ハッシュ値との整合は未解決の契約差分として隔離しており、先にその訂正作業を完了してからP1-05へ進む。
+P1-04の決定性基盤と本番相当リプレイ、P0-06実装整合訂正は完了した。旧値は履歴として隔離し、現行manifest・実行境界・fixtureバイト列を正本へ固定した。次はP1-05へ進む。
 
 - 閲覧者ごとの公開状態投影
 - command preview

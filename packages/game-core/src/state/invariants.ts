@@ -74,16 +74,26 @@ export function assertGameState(state: GameState): void {
   if (handPlayerIds.length !== playerIds.length || handPlayerIds.some((playerId) => !state.players[playerId])) {
     throw new Error("cardZones.hands must contain exactly the match players");
   }
-  const zoneGroups: readonly (readonly string[])[] = [
+  // revealedCards is a public history, not an exclusive physical card zone.
+  // A resolved card is therefore allowed to appear in both revealedCards and
+  // discardPile (the content executor records both facts).
+  const physicalZoneGroups: readonly (readonly string[])[] = [
     state.cardZones.drawPile,
     state.cardZones.discardPile,
-    state.cardZones.revealedCards,
     state.cardZones.inResolution,
     ...Object.values(state.cardZones.hands),
   ];
-  const references = countReferences(zoneGroups);
+  const references = countReferences(physicalZoneGroups);
   const cardIds = Object.keys(state.cardInstances);
   if (references.size !== cardIds.length) throw new Error("every card instance must be in exactly one zone");
+  if (new Set(state.cardZones.revealedCards).size !== state.cardZones.revealedCards.length) {
+    throw new Error("revealedCards must not contain duplicates");
+  }
+  for (const cardId of state.cardZones.revealedCards) {
+    if (!state.cardInstances[cardId] || !references.has(cardId)) {
+      throw new Error(`revealed card ${cardId} is not present in a physical zone`);
+    }
+  }
   for (const cardId of cardIds) {
     if (references.get(cardId) !== 1) throw new Error(`card ${cardId} appears in multiple or no zones`);
   }

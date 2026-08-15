@@ -35,3 +35,6 @@ export {
   calculateStateHash,
 } from "./hash/state-hash.ts";
 export * from "./replay.ts";
+export * from "./public-state.ts";
+export * from "./preview.ts";
+export * from "./summary.ts";

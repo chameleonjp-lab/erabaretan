@@ -17,7 +17,9 @@ function standardSha256(value) {
 }
 
 function storedHashInput(name) {
-  return readFileSync(new URL(`../fixtures/golden-alpha-12/${name}-state-hash-input.json`, import.meta.url), "utf8").trim();
+  const content = readFileSync(new URL(`../fixtures/golden-alpha-12/${name}-state-hash-input.json`, import.meta.url), "utf8");
+  assert.equal(content.endsWith("\n"), false, `${name} hash input fixture must not end with a newline`);
+  return content;
 }
 
 const goldenManifest = JSON.parse(readFileSync(new URL("../fixtures/golden-alpha-12/golden-manifest.json", import.meta.url), "utf8"));
@@ -152,7 +154,9 @@ test("G02 records world collapse, score, event order, and revision hash", () => 
   assert.deepEqual([result.state.randomConsumptionCount], expected.randomConsumptionCounts);
   assert.deepEqual([hashGameState(result.state)], expected.stateHashes);
   assert.equal(hashGameState(result.state), expected.finalStateHash);
-  assert.equal(serializeStateForHash(result.state), storedHashInput("g02"));
+  const serialized = serializeStateForHash(result.state);
+  assert.equal(serialized, storedHashInput("g02"));
+  assert.equal(standardSha256(serialized), expected.finalStateHash);
 });
 
 test("G03 records reflection, simultaneous defeat, and revision hash", () => {
@@ -209,5 +213,7 @@ test("G03 records reflection, simultaneous defeat, and revision hash", () => {
   assert.deepEqual([result.state.randomConsumptionCount], expected.randomConsumptionCounts);
   assert.deepEqual([hashGameState(result.state)], expected.stateHashes);
   assert.equal(hashGameState(result.state), expected.finalStateHash);
-  assert.equal(serializeStateForHash(result.state), storedHashInput("g03"));
+  const serialized = serializeStateForHash(result.state);
+  assert.equal(serialized, storedHashInput("g03"));
+  assert.equal(standardSha256(serialized), expected.finalStateHash);
 });

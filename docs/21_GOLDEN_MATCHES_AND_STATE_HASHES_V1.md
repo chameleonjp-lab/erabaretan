@@ -1,7 +1,7 @@
 # エラバレタン：ゴールデン試合と最終状態ハッシュ V1
 
-- 文書状態：P0-06 正本・実装前検証値
-- 更新日：2026-08-14
+- 文書状態：P0-06 正本・実装整合訂正版
+- 更新日：2026-08-15
 - 対象rulesetId：ruleset.alpha-12.v1
 - 対象catalogHash：catalog.alpha-12.v1
 - 関連文書：[ルールエンジン契約](08_RULE_ENGINE_CONTRACT.md)
@@ -21,6 +21,16 @@
 G01はP0-05の初期配札から始める。G02とG03は、12種類のカードだけでは一枚で作れない効果を確認するため、P0-03のX03と同じルールエンジン内部の試験用効果キューから始める。
 
 試験用効果キューはクライアント命令ではない。クライアントがDAMAGE_WORLDやREFLECT_DAMAGEの数値を直接送ってよい、という意味ではない。
+
+### 1.1 P1-04実装整合訂正
+
+P1-04実装後の実行境界と機械検査値を正本へ反映する。`state-hash.alpha-12.v1`の投影、正規化規則、バージョンは変更しない。
+
+- G01は`executeAlpha12Command`を通る本番command処理であり、revisionは0→1→2、`COMMAND_ACCEPTED`は2件。
+- G02とG03は`resolveEffectQueue`を直接呼ぶ内部効果キューハーネスであり、revisionは1→1、`COMMAND_ACCEPTED`は発生しない。`GOLDEN_EFFECT_QUEUE_RESOLVE`は公開commandとして扱わない。
+- この文書は人が読む正本、`tests/fixtures/golden-alpha-12/golden-manifest.json`と3件のstate-hash input JSONは機械検査用の正本付属データとする。両者は同時更新対象とし、golden testはmanifestとfixtureを自動検査する。Markdown本文との突合は独立レビューで確認する。
+- 3件のstate-hash input JSONは、正規化JSONと同じUTF-8バイト列として保存し、末尾の改行を含めない。ファイルの改行はハッシュ入力に含めない。
+- 旧ハッシュ値は履歴として残すが、承認済み期待値としては使わない。現行値への訂正は、PR #13のマージコミット`1ca4c55b9f617325b5940182650aa9f66a1562d4`で保存されたmanifestと実装を根拠とする。
 
 ## 2. 状態ハッシュの契約
 
@@ -123,6 +133,12 @@ G01のstatusEffectsはfragileWorld=false、nextDefensePenalty=0とする。G02�
 
 体力、手札順、山札先頭、世界責任、発生済み境界、randomConsumptionCountを一つだけ変更したコピーは、すべてハッシュが変わらなければならない。表示名やイベント表示文だけの変更では、ハッシュを変えない。
 
+### 2.7 V1の投影範囲とV2移行
+
+`state-hash.alpha-12.v1`は、2.2で列挙した項目を固定した投影のハッシュであり、ゲーム内部状態全体を証明するものではない。`pendingAttack`、`respondingPlayerId`、`cardZones.inResolution`、`scoreModifiers`など、列挙されていない項目はV1のハッシュ対象外である。
+
+P1-05で結果へ影響する状態を追加・変更し、それをハッシュ投影へ含める必要が生じた場合は、V1の意味を暗黙に変更せず`state-hash.alpha-12.v2`へ移行する。V2移行時はmanifest、3件のstate-hash input JSON、revision別ハッシュ、期待最終ハッシュを一体で更新し、V1のfixtureと期待値を上書きしない。
+
 ## 3. Golden G01：通常撃破
 
 ### 3.1 開始状態
@@ -158,7 +174,7 @@ cardZonesRef: POST_SETUP_ALPHA_12_V1 after P2 first-turn draw
 2. ACCEPT_DAMAGE(commandId=g01-command-002, playerId=P1, expectedRevision=1)
 
 expectedEventTypes:
-COMMAND_ACCEPTED, CARD_PLAYED, RESPONSE_ACCEPTED,
+COMMAND_ACCEPTED, CARD_PLAYED, COMMAND_ACCEPTED, RESPONSE_ACCEPTED,
 DAMAGE_PLAYER_APPLIED(amount=6,target=P1), PLAYER_DEFEATED(playerId=P1),
 JUDGMENT_COMPUTED, MATCH_FINISHED
 ~~~
@@ -180,7 +196,8 @@ P1.score: 2
 P2.score: 72
 cardZonesRef: POST_G01_ALPHA_12_V1
 stateHashVersion: state-hash.alpha-12.v1
-stateHash: 5a71a8de1fc13516e5494ddd1f4a2c3f35ab4303291dd541cc7cd46b4c98283c
+stateHash: 602b8c69b4921a17a55ed39263ffc0d5cd5094506a6cbff57eee46964579a986
+legacyP0_06StateHash: 5a71a8de1fc13516e5494ddd1f4a2c3f35ab4303291dd541cc7cd46b4c98283c
 ~~~
 
 ### 3.4 G01の採点
@@ -191,7 +208,7 @@ P1はsurvivedRoundCount=1で体力0のため2点、P2はsurvivedRoundCount=1、�
 
 ### 4.1 開始状態と試験用効果キュー
 
-G02は、P0-03のX03と同じ内部試験である。GOLDEN_EFFECT_QUEUE_RESOLVEは公開命令ではない。
+G02は、P0-03のX03と同じ内部試験である。`resolveEffectQueue`を直接呼ぶ内部効果キューハーネスであり、公開commandではない。`GOLDEN_EFFECT_QUEUE_RESOLVE`という架空のcommandは正本に定義しない。
 
 ~~~text
 goldenMatchId: golden-g02-world-collapse
@@ -201,7 +218,7 @@ rngAlgorithmVersion: rng.xoshiro128ss.v1
 shuffleAlgorithmVersion: shuffle.fisher-yates-desc.v1
 randomConsumptionCount: 36
 phase: RESOLUTION
-revision: 0
+revision: 1
 roundNumber: 1
 turnSequence: 1
 P1.hp: 30
@@ -210,9 +227,10 @@ world.durability: 80
 world.triggeredThresholds: []
 cardZonesRef: POST_SETUP_ALPHA_12_V1
 
-commandType: GOLDEN_EFFECT_QUEUE_RESOLVE
-commandId: g02-command-001
-sourceKind: SYSTEM
+harness: resolveEffectQueue
+commandAcceptedEvent: false
+revisionBefore: 1
+revisionAfter: 1
 effects: DAMAGE_PLAYER(target=P2,amount=30) -> DAMAGE_WORLD(sourceOwner=P1,amount=80)
 ~~~
 
@@ -222,7 +240,7 @@ effects: DAMAGE_PLAYER(target=P2,amount=30) -> DAMAGE_WORLD(sourceOwner=P1,amoun
 
 ~~~text
 expectedEventTypes:
-COMMAND_ACCEPTED, DAMAGE_PLAYER_APPLIED(amount=30,target=P2), PLAYER_DEFEATED(playerId=P2),
+DAMAGE_PLAYER_APPLIED(amount=30,target=P2), PLAYER_DEFEATED(playerId=P2),
 DAMAGE_WORLD_APPLIED(requested=80,effective=80,owner=P1),
 WORLD_THRESHOLD_TRIGGERED(75), WORLD_THRESHOLD_TRIGGERED(50), WORLD_THRESHOLD_TRIGGERED(25),
 WORLD_LAW_EFFECT_APPLIED(75,target=P1,penalty=2),
@@ -248,7 +266,8 @@ P1.score: -193
 P2.score: 2
 cardZonesRef: POST_SETUP_ALPHA_12_V1
 stateHashVersion: state-hash.alpha-12.v1
-stateHash: 3fb02be15bc2ea4aaa4b6f4044381de3d5eaeb752124f1becd9b28ccf7b3e46b
+stateHash: 4babd8496ad012d8642baa395d840a47921ae81fac528c7829c6d889b32ce775
+legacyP0_06StateHash: 3fb02be15bc2ea4aaa4b6f4044381de3d5eaeb752124f1becd9b28ccf7b3e46b
 ~~~
 
 P1は戦闘上の生存者だが、世界を80損傷させたため、世界損傷の減点と破界責任25を受ける。その結果、戦闘では敗れたP2が神の選定者になる。
@@ -257,7 +276,7 @@ P1は戦闘上の生存者だが、世界を80損傷させたため、世界損�
 
 ### 5.1 開始状態と試験用効果キュー
 
-G03は、初期12種類のカード展開では使わないREFLECT_DAMAGEを、効果命令の登録処理として検査する。反射への再応答は開かない。
+G03は、初期12種類のカード展開では使わないREFLECT_DAMAGEを、`resolveEffectQueue`を直接呼ぶ内部効果キューハーネスで検査する。反射への再応答は開かない。公開commandではない。
 
 ~~~text
 goldenMatchId: golden-g03-simultaneous-reflection
@@ -267,7 +286,7 @@ rngAlgorithmVersion: rng.xoshiro128ss.v1
 shuffleAlgorithmVersion: shuffle.fisher-yates-desc.v1
 randomConsumptionCount: 36
 phase: RESOLUTION
-revision: 0
+revision: 1
 roundNumber: 1
 turnSequence: 1
 P1.hp: 10
@@ -277,9 +296,10 @@ world.triggeredThresholds: []
 cardZonesRef: POST_SETUP_ALPHA_12_V1
 pendingAttackId: golden-g03-attack
 
-commandType: GOLDEN_EFFECT_QUEUE_RESOLVE
-commandId: g03-command-001
-sourceKind: SYSTEM
+harness: resolveEffectQueue
+commandAcceptedEvent: false
+revisionBefore: 1
+revisionAfter: 1
 effects: DAMAGE_PLAYER(target=P2,amount=10) -> REFLECT_DAMAGE(target=P1,amount=10,pendingAttackId=golden-g03-attack) -> DAMAGE_WORLD(sourceOwner=P1,amount=30)
 ~~~
 
@@ -287,9 +307,9 @@ effects: DAMAGE_PLAYER(target=P2,amount=10) -> REFLECT_DAMAGE(target=P1,amount=1
 
 ~~~text
 expectedEventTypes:
-COMMAND_ACCEPTED, DAMAGE_PLAYER_APPLIED(amount=10,target=P2),
-REFLECT_DAMAGE_APPLIED(amount=10,target=P1), PLAYER_DEFEATED(playerId=P1),
-PLAYER_DEFEATED(playerId=P2), DAMAGE_WORLD_APPLIED(requested=30,effective=30,owner=P1),
+DAMAGE_PLAYER_APPLIED(amount=10,target=P2), PLAYER_DEFEATED(playerId=P2),
+REFLECT_DAMAGE_APPLIED(amount=10,target=P1), DAMAGE_PLAYER_APPLIED(amount=10,target=P1),
+PLAYER_DEFEATED(playerId=P1), DAMAGE_WORLD_APPLIED(requested=30,effective=30,owner=P1),
 WORLD_THRESHOLD_TRIGGERED(25), WORLD_LAW_EFFECT_APPLIED(25,target=none),
 WORLD_COLLAPSED, JUDGMENT_COMPUTED, MATCH_FINISHED
 
@@ -311,7 +331,8 @@ P1.score: -113
 P2.score: 2
 cardZonesRef: POST_SETUP_ALPHA_12_V1
 stateHashVersion: state-hash.alpha-12.v1
-stateHash: e627f69a3bf8c319570f7645a6b059926468c8f61c71136b08aed55187ba9577
+stateHash: fe92cf144e1e900c5cf15324776beef99f87e18cb4ce7f62c3ec1842eb9a139f
+legacyP0_06StateHash: e627f69a3bf8c319570f7645a6b059926468c8f61c71136b08aed55187ba9577
 ~~~
 
 両者の体力が0なので戦闘は引き分けである。ただし、P1が世界を30損傷させたため、神の評価はP2が上回る。世界崩壊と同時死亡は、どちらか一方へ潰さず、両方の終端フラグを保存する。
@@ -327,7 +348,9 @@ stateHash: e627f69a3bf8c319570f7645a6b059926468c8f61c71136b08aed55187ba9577
 5. 最終状態ハッシュが完全一致する。
 6. 不正命令や同じ命令の再送で、乱数消費数と状態が変わらない。
 7. G02、G03の試験用効果キューを、公開クライアント命令として受理しない。
-
+8. `golden-manifest.json`と3件のstate-hash input JSONが、実行入力、全イベント列、revision、乱数消費数、状態ハッシュと一致する。
+9. G02とG03は`resolveEffectQueue`直接実行、revision 1→1、`COMMAND_ACCEPTED`なしという境界を満たす。
+10. state-hash input JSONの末尾改行を含まないUTF-8バイト列が、`serializeStateForHash`の出力と一致する。
 ハッシュが一致してもイベント順が違う場合は合格にしない。逆にイベント順だけが一致してハッシュが違う場合も合格にしない。
 
 ## 7. P0-06完了判定
@@ -340,5 +363,18 @@ stateHash: e627f69a3bf8c319570f7645a6b059926468c8f61c71136b08aed55187ba9577
 - [x] 各ケースの最終状態ハッシュを固定した。
 - [x] 反射と複数境界は、初期12種類のクライアントカードではなく、ルール命令試験として区別した。
 - [x] ハッシュ変更検出と、不正命令・再送時の乱数非消費を定義した。
+- [x] manifestと3件のstate-hash input JSONを機械検査用の正本付属データとして固定した。
+- [x] G01の本番command境界、G02/G03の直接効果キューハーネス境界を固定した。
+- [x] 旧ハッシュ値を履歴として隔離し、現行実装の期待値から除外した。
 
-P0-06は完了とする。P0-01〜P0-06の仕様固定が終わったため、次はP1-01「純粋なstate / command基盤」へ進む。P1では、画面、通信、保存、CPUをまだ混ぜない。
+P0-06は実装整合訂正版として完了とする。`state-hash.alpha-12.v1`の投影と正規化規則は変更していない。P0-01〜P0-06とP1-01〜P1-04の決定性基盤が揃ったため、次はP1-05「projection / preview / summary」へ進む。P1では、画面、通信、保存、CPUをまだ混ぜない。
+
+## 8. 旧P0-06検証値の履歴
+
+生成元の完全な正規化JSONが保存されていないため、次の値は現行実装の承認済み期待値ではない。2026-08-15、PR #13のマージコミット`1ca4c55b9f617325b5940182650aa9f66a1562d4`で保存されたmanifestと実装を基準に、現行値を採用した。
+
+| ケース | 旧P0-06値 | 現行承認値 |
+|---|---|---|
+| G01 | `5a71a8de1fc13516e5494ddd1f4a2c3f35ab4303291dd541cc7cd46b4c98283c` | `602b8c69b4921a17a55ed39263ffc0d5cd5094506a6cbff57eee46964579a986` |
+| G02 | `3fb02be15bc2ea4aaa4b6f4044381de3d5eaeb752124f1becd9b28ccf7b3e46b` | `4babd8496ad012d8642baa395d840a47921ae81fac528c7829c6d889b32ce775` |
+| G03 | `e627f69a3bf8c319570f7645a6b059926468c8f61c71136b08aed55187ba9577` | `fe92cf144e1e900c5cf15324776beef99f87e18cb4ce7f62c3ec1842eb9a139f` |

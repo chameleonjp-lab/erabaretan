@@ -2,6 +2,7 @@ import type { CommandValidationOptions } from "../../../game-core/src/commands/v
 import type { Command } from "../../../game-core/src/commands/types.ts";
 import {
   applyCommand,
+  advanceToNextTurnStart,
   beginPendingAttack,
   openResponseSelection,
   resolveEffectQueue,
@@ -34,7 +35,7 @@ function moveResolvedCards(state: GameState, cardInstanceIds: readonly string[])
     cardZones: { ...state.cardZones, inResolution, discardPile, revealedCards },
     cardInstances,
   } as GameState;
-  return nextState;
+  return phase === "FINISHED" ? nextState : advanceToNextTurnStart(nextState);
 }
 
 function firstAttackDamage(effects: readonly { readonly commandType: string; readonly payload: unknown }[]): number | null {
@@ -68,7 +69,13 @@ function buildCardEffects(state: GameState, action: CardResolutionAction) {
         turnSequence: state.turnSequence,
       })
     : [];
-  return [...responseEffects, ...attackEffects];
+  const responseModifiers = responseEffects.filter((effect) => (
+    effect.commandType === "ADD_SHIELD"
+    || effect.commandType === "REDUCE_INCOMING_DAMAGE"
+    || effect.executionTiming === "AFTER_RESPONSE_MODIFIERS"
+  ));
+  const responseWorldEffects = responseEffects.filter((effect) => !responseModifiers.includes(effect));
+  return [...responseModifiers, ...attackEffects, ...responseWorldEffects];
 }
 
 function resolveCardResolution(state: GameState): { readonly state: GameState; readonly events: readonly { readonly type: string }[] } {

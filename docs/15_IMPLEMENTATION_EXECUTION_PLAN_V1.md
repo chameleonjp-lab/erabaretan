@@ -1,7 +1,7 @@
 # 選ばれたん：実装実行計画 V1
 
 - 文書状態：現行・実装工程の基準
-- 更新日：2026-08-15
+- 更新日：2026-08-16
 - 上位文書：`14_INTEGRATED_PLAN_V4.md`
 - 対象：12種類の仕様固定から限定オンライン公開判断まで
 
@@ -811,3 +811,10 @@ P1-01「純粋なstate / command基盤」、P1-02「effects / PAY_HP」、P1-03�
 ## 16. P2-01「basic fixtures」完了記録
 
 P2-01では、`tests/game-core/p2-01-fixtures.test.mjs`にFixture A〜Fの7契約試験を追加した。Aは先攻初回補充なし・後続補充・手札上限・overflowを、B〜Eは75/50/25境界と応答・自己損傷を、Fは通常撃破と72対2の神の評価をproduction executor経由で固定する。TURN_STARTの入力不要処理は`resolveTurnStart`としてgame-coreへ追加し、補充カードの一意性、owner/zone、revisionを検証する。次はP2-02の敵対的Fixtureへ進む。
+
+
+## 17. P2-02「adversarial fixtures」完了記録
+
+P2-02では、tests/game-core/p2-02-adversarial-fixtures.test.mjsにX01〜X14の14契約試験を追加した。X01〜X03は境界の厳密判定・再通過・複数境界、X04〜X10は世界0、実効値、同率責任、盾、山札切れ、脆い世界の自己損傷、X11〜X12はフィールド上書きと消去順、X13〜X14は再送・古いrevision・不正入力を検証する。X03はクライアント命令ではなくeffect queue単体試験として分離し、X14は拒否前後のdeep snapshot、reasonCode、revisionを固定した。
+
+P2-01で追加された手番終了から次のTURN_STARTへのproduction executor接続も正本へ反映し、P2-01/P2-02をmain上で同じ手順で実行できるようにした。typecheckと全85件の試験が通過し、Sol・Highの独立レビューはAPPROVEとなった。次はP2-03「invariant / secrecy tests」へ進む。

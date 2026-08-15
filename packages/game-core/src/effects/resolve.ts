@@ -555,10 +555,16 @@ function applySetField(state: GameState, effect: EffectCommand, payload: SetFiel
   if (payload.expiresAfterTurnSequence <= state.turnSequence || payload.ownerPlayerId !== effect.source.ownerPlayerId) return reject(effect, "EFFECT_CONDITION_NOT_MET");
   const nextState = { ...state, activeField: { fieldDefinitionId: payload.fieldDefinitionId, ownerPlayerId: payload.ownerPlayerId, expiresAfterTurnSequence: payload.expiresAfterTurnSequence, lastFrenziedCardInstanceId: null, rootSanctuaryUsedTurnSequence: null } };
   const eventTypes = state.activeField ? ["FIELD_CLEARED", "FIELD_SET"] : ["FIELD_SET"];
+  const events = state.activeField
+    ? [
+        event(effect, "FIELD_CLEARED", { fieldDefinitionId: state.activeField.fieldDefinitionId }),
+        event(effect, "FIELD_SET", { fieldDefinitionId: payload.fieldDefinitionId }),
+      ]
+    : [event(effect, "FIELD_SET", { fieldDefinitionId: payload.fieldDefinitionId })];
   return {
     state: nextState,
     result: result(effect, "APPLIED", { requested: 1, effective: 1, before: { fieldDefinitionId: state.activeField?.fieldDefinitionId ?? null }, after: { fieldDefinitionId: payload.fieldDefinitionId }, eventTypes }),
-    events: eventTypes.map((type) => event(effect, type, { fieldDefinitionId: payload.fieldDefinitionId })),
+    events,
   };
 }
 

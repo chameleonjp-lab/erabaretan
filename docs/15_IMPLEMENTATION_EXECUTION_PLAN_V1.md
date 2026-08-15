@@ -1,7 +1,7 @@
 # 選ばれたん：実装実行計画 V1
 
 - 文書状態：現行・実装工程の基準
-- 更新日：2026-08-13
+- 更新日：2026-08-15
 - 上位文書：`14_INTEGRATED_PLAN_V4.md`
 - 対象：12種類の仕様固定から限定オンライン公開判断まで
 
@@ -234,7 +234,7 @@ reduce(state, validatedCommand, rng)
 
 ### 4.0 P1-01 / P1-02の完了
 
-[P1-01正本](22_GAME_CORE_STATE_AND_COMMAND_BASE_V1.md)として、GameState、7種類のcommand型、validation、revision、再送防止、RESOLUTION割り込み拒否、カードzoneを実装した。[P1-02正本](23_GAME_CORE_EFFECTS_PAY_HP_V1.md)として、16種類の効果命令、原子的な効果キュー、盾・反射・世界耐久の基礎処理、`PAY_HP`、初期12枚の効果ビルダーを追加した。次はP1-03で世界境界、フィールド自動効果、カード条件、終了判定、採点を追加する。
+[P1-01正本](22_GAME_CORE_STATE_AND_COMMAND_BASE_V1.md)として、GameState、7種類のcommand型、validation、revision、再送防止、RESOLUTION割り込み拒否、カードzoneを実装した。[P1-02正本](23_GAME_CORE_EFFECTS_PAY_HP_V1.md)として、16種類の効果命令、原子的な効果キュー、盾・反射・世界耐久の基礎処理、`PAY_HP`、初期12枚の効果ビルダーを追加した。[P1-03正本](24_GAME_CORE_WORLD_BOUNDARIES_TERMINAL_V1.md)として、世界境界、フィールド自動効果、カード条件、終了判定、採点を追加した。[P1-04実装記録](25_GAME_CORE_RNG_REPLAY_HASH_V1.md)として、決定的乱数、初期配札、状態ハッシュ、本番相当の受理command列再生検証を追加した。P0-06旧ハッシュ値との整合は、生成元JSONが未保存のためP1-04bとして訂正する。訂正後にP1-05で公開状態投影、preview、summaryを追加する。
 
 ## 4.1 実装順
 
@@ -249,11 +249,12 @@ reduce(state, validatedCommand, rng)
 9. `PAY_HP`
 10. 終了条件と終了種別
 11. 神の評価
-12. 決定的乱数
-13. 公開状態への投影
-14. event生成
-15. `previewCommand`
-16. `summarizeMatch`
+12. 決定的乱数（P1-04で実装済み）
+13. リプレイと状態ハッシュ（P1-04で実装済み。P0-06旧値整合はP1-04b）
+14. 公開状態への投影（P1-05）
+15. event生成
+16. `previewCommand`（P1-05）
+17. `summarizeMatch`（P1-05）
 
 ## 4.2 絶対に依存させないもの
 
@@ -783,7 +784,7 @@ copiesInDeck
 
 **P0-06：ゴールデン試合3件と最終状態ハッシュを[正本](21_GOLDEN_MATCHES_AND_STATE_HASHES_V1.md)へ定義する。**
 
-P0完了判定後、P1-01からgame-core実装を開始した。P1-01とP1-02が完了したため、P1-03へ進む。
+P0完了判定後、P1-01からgame-core実装を開始した。P1-01〜P1-04の決定性基盤実装が完了した。P0-06旧ハッシュ値との整合をP1-04bで訂正してから、P1-05へ進む。
 
 ---
 
@@ -802,4 +803,4 @@ P0完了判定後、P1-01からgame-core実装を開始した。P1-01とP1-02が
 
 以上をもって、企画レビューから実装計画への変換は完了とする。
 
-P1-01「純粋なstate / command基盤」とP1-02「effects / PAY_HP」は完了した。次のフェーズはP1-03「thresholds / scoring」である。
+P1-01「純粋なstate / command基盤」、P1-02「effects / PAY_HP」、P1-03「thresholds / scoring」、P1-04「rng / replay / hash」の決定性基盤実装は完了した。P0-06旧ハッシュ値との整合はP1-04bで訂正し、次のフェーズP1-05「projection / preview / summary」へ進む。

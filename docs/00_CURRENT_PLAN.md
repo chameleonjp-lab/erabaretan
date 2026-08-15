@@ -1,7 +1,7 @@
 # 選ばれたん：現行計画の参照順
 
 - 文書状態：現行
-- 更新日：2026-08-14
+- 更新日：2026-08-15
 - 適用対象：企画、ルール、実装、試遊、公開判断
 
 ## 1. この文書の目的
@@ -69,6 +69,8 @@
 6. [ゴールデン試合と最終状態ハッシュ](21_GOLDEN_MATCHES_AND_STATE_HASHES_V1.md)
 7. [game-core state / command基盤](22_GAME_CORE_STATE_AND_COMMAND_BASE_V1.md)
 8. [game-core effects / PAY_HP](23_GAME_CORE_EFFECTS_PAY_HP_V1.md)
+9. [game-core world boundaries / terminal / scoring](24_GAME_CORE_WORLD_BOUNDARIES_TERMINAL_V1.md)
+10. [game-core RNG / replay / state hash](25_GAME_CORE_RNG_REPLAY_HASH_V1.md)
 
 状態遷移、補充順、手札上限、命令受理、効果、世界境界、終了、採点、リプレイ、不変条件の詳細を扱う。
 
@@ -261,6 +263,10 @@ P0では次を揃える。
 
 **P1-02「effects / PAY_HP」は完了。**
 
+**P1-03「thresholds / scoring」は完了。**
+
+**P1-04「rng / replay / hash」の決定性基盤実装は完了。P0-06旧ハッシュ値との整合は未解決の契約差分として別作業に切り出した。**
+
 正本：
 
 - [初期12種類カード仕様 V1](16_INITIAL_12_CARD_SPEC_V1.md)
@@ -271,5 +277,7 @@ P0では次を揃える。
 - [ゴールデン試合と最終状態ハッシュ V1](21_GOLDEN_MATCHES_AND_STATE_HASHES_V1.md)
 - [game-core state / command基盤 V1](22_GAME_CORE_STATE_AND_COMMAND_BASE_V1.md)
 - [game-core effects / PAY_HP V1](23_GAME_CORE_EFFECTS_PAY_HP_V1.md)
+- [game-core world boundaries / terminal / scoring V1](24_GAME_CORE_WORLD_BOUNDARIES_TERMINAL_V1.md)
+- [game-core RNG / replay / state hash V1](25_GAME_CORE_RNG_REPLAY_HASH_V1.md)
 
-次の作業は、P1-03「thresholds / scoring」である。P1-02の効果解決が完了したため、世界境界、フィールド自動効果、カード条件、終了判定、採点へ進める。
+P1-03「thresholds / scoring」とP1-04「rng / replay / hash」の決定性基盤実装は完了した。P0-06旧ハッシュ値との整合は、生成元JSONが未保存のため別作業として訂正する。次にP1-04bでその入力を再固定し、完了後にP1-05「projection / preview / summary」へ進む。

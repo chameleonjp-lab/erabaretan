@@ -377,7 +377,7 @@ export function validateInitial12CardPlay(input: ValidateInitial12CardPlayInput)
 export const initial12CommandValidationOptions: CommandValidationOptions = {
   cardConditionValidator: (input) => {
     const validation = validateInitial12CardPlay(input);
-    if (validation.ok) return { ok: true };
+    if (validation.ok === true) return { ok: true };
     return {
       ok: false,
       code: validation.code === "INVALID_TARGET" ? "INVALID_TARGET" : "CARD_CONDITION_NOT_MET",

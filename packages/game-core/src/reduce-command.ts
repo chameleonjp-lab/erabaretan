@@ -141,7 +141,7 @@ function moveToDiscard(
   };
 }
 
-function moveTimeoutCardToDiscard(state: GameState, command: Extract<Command, { commandType: "TIMEOUT_DEFAULT_ACTION" }>, revision: number) {
+function moveTimeoutCardToDiscard(state: GameState, command: Extract<Command, { commandType: "TIMEOUT_DEFAULT_ACTION" }>, revision: number): { readonly state: GameState; readonly events: readonly CoreEvent[] } {
   const hand = state.cardZones.hands[command.playerId];
   if (hand.length === 0) {
     return {
@@ -226,7 +226,7 @@ function answerResponse(
     cardDefinitionId: pending.cardDefinitionId,
     playMode: pending.playMode,
     targetPlayerId: pending.targetPlayerId,
-    discardCardInstanceId: pending.discardCardInstanceId ?? null,
+    discardCardInstanceId: null,
     responseCardInstanceId,
     responseMode,
   };
@@ -252,7 +252,7 @@ function answerResponse(
 
 export function applyCommand(state: GameState, input: unknown, options: CommandValidationOptions = {}): CommandResult {
   const validation = validateCommand(state, input, options);
-  if (!validation.ok) {
+  if (validation.ok === false) {
     const commandId = validation.error.commandId;
     return {
       accepted: false,

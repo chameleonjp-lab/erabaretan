@@ -29,6 +29,8 @@
 - [ゴールデン試合と最終状態ハッシュ V1](docs/21_GOLDEN_MATCHES_AND_STATE_HASHES_V1.md)
 - [game-core state / command基盤 V1](docs/22_GAME_CORE_STATE_AND_COMMAND_BASE_V1.md)
 - [game-core effects / PAY_HP V1](docs/23_GAME_CORE_EFFECTS_PAY_HP_V1.md)
+- [game-core world boundaries / terminal / scoring V1](docs/24_GAME_CORE_WORLD_BOUNDARIES_TERMINAL_V1.md)
+- [game-core RNG / replay / state hash V1](docs/25_GAME_CORE_RNG_REPLAY_HASH_V1.md)
 
 ### レビュー
 
@@ -44,7 +46,7 @@
 
 ## 現在の段階
 
-P1-02のgame-core効果解決実装段階です。
+P1-04の決定性基盤実装段階（P0-06ハッシュ整合の訂正作業を残す）です。
 
 P0-01として、[初期12種類カード仕様 V1](docs/16_INITIAL_12_CARD_SPEC_V1.md)を作成しました。カードの最終バランスではなく、12種類で中心体験を検証するための正本です。
 
@@ -62,6 +64,10 @@ P1-01として、[game-core state / command基盤 V1](docs/22_GAME_CORE_STATE_AN
 
 P1-02として、[game-core effects / PAY_HP V1](docs/23_GAME_CORE_EFFECTS_PAY_HP_V1.md)を実装しました。16種類の効果命令、原子的な効果キュー、盾・反射・世界耐久の基礎処理、`PAY_HP`、初期12枚の効果ビルダーを固定しています。
 
+P1-03として、[game-core world boundaries / terminal / scoring V1](docs/24_GAME_CORE_WORLD_BOUNDARIES_TERMINAL_V1.md)を実装しました。世界境界、フィールド自動効果、カード条件、終了判定、採点を固定し、P1-03関連のgame-core試験を通しました。
+
+P1-04として、[game-core RNG / replay / state hash V1](docs/25_GAME_CORE_RNG_REPLAY_HASH_V1.md)を実装しました。決定的乱数、初期配札、状態ハッシュ、本番相当の受理command列再生、G01〜G03の現行正規化JSON・イベント・revision・乱数消費数をmanifest fixtureへ固定し、56件の試験とTypeScript型検査を通しました。P0-06旧ハッシュ値との整合は、生成元JSONが未保存のため別の訂正作業として残しています。
+
 ゲームエンジニアレビューにより、次を初期ルールとして固定しました。
 
 - カード補充は手番開始時
@@ -73,10 +79,11 @@ P1-02として、[game-core effects / PAY_HP V1](docs/23_GAME_CORE_EFFECTS_PAY_H
 - 同時死亡、世界0、最大ラウンド、降参、切断の扱い
 - 決定的な乱数、リプレイ、秘密情報、ルール版固定の方針
 
-P0-01、P0-02、P0-03、P0-04、P0-05、P0-06、P1-01、P1-02は完了しました。次の実装作業は次のとおりです。
+P0-01、P0-02、P0-03、P0-04、P0-05、P0-06、P1-01、P1-02、P1-03、P1-04の決定性基盤実装は完了しました。P0-06旧ハッシュ値との整合は未解決の契約差分として別作業に切り出しています。次の実装作業は次のとおりです。
 
-1. P1-03：thresholds / scoring
+1. P1-04b：P0-06ゴールデン入力JSON・revision別ハッシュ・イベント列の訂正
+2. P1-05：projection / preview / summary
 
-P1-02の効果解決境界を使って、世界境界、フィールド自動効果、カード条件、終了判定、採点を純粋な処理へ追加します。
+P1-04までの決定性とハッシュ境界を維持しながら、閲覧者ごとの公開状態投影、preview、結果summaryを純粋な処理へ追加します。
 
 通信機能からは作りません。面白さ、採点の納得感、決定的な再現性を確認した後、24種類のオフライン試作、36種類の完成品質確認版、合言葉オンライン対戦、48種類の限定公開版へ進みます。

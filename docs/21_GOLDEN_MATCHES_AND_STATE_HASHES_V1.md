@@ -28,7 +28,7 @@ P1-04実装後の実行境界と機械検査値を正本へ反映する。`state
 
 - G01は`executeAlpha12Command`を通る本番command処理であり、revisionは0→1→2、`COMMAND_ACCEPTED`は2件。
 - G02とG03は`resolveEffectQueue`を直接呼ぶ内部効果キューハーネスであり、revisionは1→1、`COMMAND_ACCEPTED`は発生しない。`GOLDEN_EFFECT_QUEUE_RESOLVE`は公開commandとして扱わない。
-- この文書は人が読む正本、`tests/fixtures/golden-alpha-12/golden-manifest.json`と3件のstate-hash input JSONは機械検査用の正本付属データとする。両者が食い違った場合は試験失敗とし、片方だけを更新しない。
+- この文書は人が読む正本、`tests/fixtures/golden-alpha-12/golden-manifest.json`と3件のstate-hash input JSONは機械検査用の正本付属データとする。両者は同時更新対象とし、golden testはmanifestとfixtureを自動検査する。Markdown本文との突合は独立レビューで確認する。
 - 3件のstate-hash input JSONは、正規化JSONと同じUTF-8バイト列として保存し、末尾の改行を含めない。ファイルの改行はハッシュ入力に含めない。
 - 旧ハッシュ値は履歴として残すが、承認済み期待値としては使わない。現行値への訂正は、PR #13のマージコミット`1ca4c55b9f617325b5940182650aa9f66a1562d4`で保存されたmanifestと実装を根拠とする。
 
@@ -132,6 +132,12 @@ G01のstatusEffectsはfragileWorld=false、nextDefensePenalty=0とする。G02�
 ### 2.6 変更検出
 
 体力、手札順、山札先頭、世界責任、発生済み境界、randomConsumptionCountを一つだけ変更したコピーは、すべてハッシュが変わらなければならない。表示名やイベント表示文だけの変更では、ハッシュを変えない。
+
+### 2.7 V1の投影範囲とV2移行
+
+`state-hash.alpha-12.v1`は、2.2で列挙した項目を固定した投影のハッシュであり、ゲーム内部状態全体を証明するものではない。`pendingAttack`、`respondingPlayerId`、`cardZones.inResolution`、`scoreModifiers`など、列挙されていない項目はV1のハッシュ対象外である。
+
+P1-05で結果へ影響する状態を追加・変更し、それをハッシュ投影へ含める必要が生じた場合は、V1の意味を暗黙に変更せず`state-hash.alpha-12.v2`へ移行する。V2移行時はmanifest、3件のstate-hash input JSON、revision別ハッシュ、期待最終ハッシュを一体で更新し、V1のfixtureと期待値を上書きしない。
 
 ## 3. Golden G01：通常撃破
 
@@ -301,9 +307,9 @@ effects: DAMAGE_PLAYER(target=P2,amount=10) -> REFLECT_DAMAGE(target=P1,amount=1
 
 ~~~text
 expectedEventTypes:
-DAMAGE_PLAYER_APPLIED(amount=10,target=P2),
-REFLECT_DAMAGE_APPLIED(amount=10,target=P1), PLAYER_DEFEATED(playerId=P1),
-PLAYER_DEFEATED(playerId=P2), DAMAGE_WORLD_APPLIED(requested=30,effective=30,owner=P1),
+DAMAGE_PLAYER_APPLIED(amount=10,target=P2), PLAYER_DEFEATED(playerId=P2),
+REFLECT_DAMAGE_APPLIED(amount=10,target=P1), DAMAGE_PLAYER_APPLIED(amount=10,target=P1),
+PLAYER_DEFEATED(playerId=P1), DAMAGE_WORLD_APPLIED(requested=30,effective=30,owner=P1),
 WORLD_THRESHOLD_TRIGGERED(25), WORLD_LAW_EFFECT_APPLIED(25,target=none),
 WORLD_COLLAPSED, JUDGMENT_COMPUTED, MATCH_FINISHED
 
@@ -342,7 +348,7 @@ legacyP0_06StateHash: e627f69a3bf8c319570f7645a6b059926468c8f61c71136b08aed55187
 5. 最終状態ハッシュが完全一致する。
 6. 不正命令や同じ命令の再送で、乱数消費数と状態が変わらない。
 7. G02、G03の試験用効果キューを、公開クライアント命令として受理しない。
-8. `golden-manifest.json`と3件のstate-hash input JSONが、本文の入力、全イベント列、revision、乱数消費数、状態ハッシュと一致する。
+8. `golden-manifest.json`と3件のstate-hash input JSONが、実行入力、全イベント列、revision、乱数消費数、状態ハッシュと一致する。
 9. G02とG03は`resolveEffectQueue`直接実行、revision 1→1、`COMMAND_ACCEPTED`なしという境界を満たす。
 10. state-hash input JSONの末尾改行を含まないUTF-8バイト列が、`serializeStateForHash`の出力と一致する。
 ハッシュが一致してもイベント順が違う場合は合格にしない。逆にイベント順だけが一致してハッシュが違う場合も合格にしない。

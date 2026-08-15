@@ -64,6 +64,8 @@ G01は`executeAlpha12Command`を通る本番command pipelineで、revision 0→1
 
 3件のstate-hash input JSONは、`serializeStateForHash`の出力と同じUTF-8バイト列として保存し、末尾の改行を含めない。試験はtrimで改行を吸収せず、ファイルバイト列とハッシュ入力の一致を検査する。旧値へ合わせるために状態モデルから情報を削る実装は採用しない。
 
+P1-05で結果へ影響する状態を追加・変更し、それをハッシュ投影へ含める必要が生じた場合は、`state-hash.alpha-12.v1`を暗黙に変更せず`state-hash.alpha-12.v2`へ移行する。V2移行時はmanifest、3件のstate-hash input JSON、revision別ハッシュ、期待最終ハッシュを一体で更新し、V1のfixtureと期待値を上書きしない。
+
 ## 4. 試験結果
 
 ```text

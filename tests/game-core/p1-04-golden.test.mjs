@@ -154,7 +154,9 @@ test("G02 records world collapse, score, event order, and revision hash", () => 
   assert.deepEqual([result.state.randomConsumptionCount], expected.randomConsumptionCounts);
   assert.deepEqual([hashGameState(result.state)], expected.stateHashes);
   assert.equal(hashGameState(result.state), expected.finalStateHash);
-  assert.equal(serializeStateForHash(result.state), storedHashInput("g02"));
+  const serialized = serializeStateForHash(result.state);
+  assert.equal(serialized, storedHashInput("g02"));
+  assert.equal(standardSha256(serialized), expected.finalStateHash);
 });
 
 test("G03 records reflection, simultaneous defeat, and revision hash", () => {
@@ -211,5 +213,7 @@ test("G03 records reflection, simultaneous defeat, and revision hash", () => {
   assert.deepEqual([result.state.randomConsumptionCount], expected.randomConsumptionCounts);
   assert.deepEqual([hashGameState(result.state)], expected.stateHashes);
   assert.equal(hashGameState(result.state), expected.finalStateHash);
-  assert.equal(serializeStateForHash(result.state), storedHashInput("g03"));
+  const serialized = serializeStateForHash(result.state);
+  assert.equal(serialized, storedHashInput("g03"));
+  assert.equal(standardSha256(serialized), expected.finalStateHash);
 });

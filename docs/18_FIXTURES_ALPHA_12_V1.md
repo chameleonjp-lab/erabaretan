@@ -1,7 +1,7 @@
 # エラバレタン：alpha-12 Fixture仕様 V1
 
-- 文書状態：P2-01 実装契約・正本
-- 更新日：2026-08-15
+- 文書状態：P2-02 実装契約・正本
+- 更新日：2026-08-16
 - fixtureSetId：fixture.alpha-12.v1
 - 対象rulesetId：ruleset.alpha-12.v1
 - 対象worldLawId：world-law.primordial-fracture.v1
@@ -857,3 +857,10 @@ P0-03は完了とする。共通効果命令の正式な入力型と出力型は
 ## P2-01 実装記録
 
 Fixture A〜Fは、`tests/game-core/p2-01-fixtures.test.mjs`で自動化した。Aでは`resolveTurnStart`を通じて先攻初回の補充なし、後続手番の1枚補充、手札9枚、既存overflow、補充カードのowner/zone、revisionを検証する。B〜Eではalpha-12のproduction executorを通じて75・50・25境界、PAY_HP、応答再生、自己損傷の開始時点を検証し、Fでは通常撃破・戦闘勝者・神の選定者・72対2の採点を検証する。X01〜X14はP2-02以降の対象として変更しない。
+
+
+## P2-02 実装記録
+
+Fixture X01〜X14をtests/game-core/p2-02-adversarial-fixtures.test.mjsで自動化した。X01は未発火の77→76と77→75の境界値、X02は回復後の再通過、X03は一つのeffect queueで75・50・25を越える順序、X04は世界耐久0へのクランプ、X05〜X10は実効再生・同率責任・ペナルティ消費・山札切れ・実効0・通常盾、X11〜X12はフィールドの旧/新イベントと消去後の損傷、X13〜X14は再送・古いrevision・X14-a〜hの不正入力を検証する。
+
+X03はクライアントからDAMAGE_WORLDを直接受け付ける試験ではなく、正本どおりルールエンジンのeffect queue試験として実行する。各拒否ケースは開始stateのdeep snapshot、COMMAND_REJECTEDのreasonCode/revision、state不変を検査する。P2-02の次はP2-03「invariant / secrecy tests」へ進む。

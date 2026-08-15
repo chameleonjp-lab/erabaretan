@@ -786,7 +786,7 @@ copiesInDeck
 
 **P0-06：ゴールデン試合3件と最終状態ハッシュを[正本](21_GOLDEN_MATCHES_AND_STATE_HASHES_V1.md)へ定義する。**
 
-P0完了判定後、P1-01からgame-core実装を開始した。P1-01〜P1-04bの決定性基盤実装が完了した。P0-06の旧値は履歴として隔離し、現行manifestを正本付属データとして固定した。P1-05とP2-01も完了し、次はP2-02へ進む。
+P0完了判定後、P1-01からgame-core実装を開始した。P1-01〜P1-04bの決定性基盤実装が完了した。P0-06の旧値は履歴として隔離し、現行manifestを正本付属データとして固定した。P1-05とP2-01〜P2-03も完了し、次はP3-01へ進む。
 
 ---
 
@@ -805,7 +805,7 @@ P0完了判定後、P1-01からgame-core実装を開始した。P1-01〜P1-04b�
 
 以上をもって、企画レビューから実装計画への変換は完了とする。
 
-P1-01「純粋なstate / command基盤」、P1-02「effects / PAY_HP」、P1-03「thresholds / scoring」、P1-04「rng / replay / hash」、P1-04b「P0-06実装整合訂正」、P1-05「projection / preview / summary」、P2-01「basic fixtures」の実装は完了した。次のフェーズP2-02「adversarial fixtures」へ進む。
+P1-01「純粋なstate / command基盤」、P1-02「effects / PAY_HP」、P1-03「thresholds / scoring」、P1-04「rng / replay / hash」、P1-04b「P0-06実装整合訂正」、P1-05「projection / preview / summary」、P2-01「basic fixtures」、P2-02「adversarial fixtures」、P2-03「invariant / secrecy tests」の実装は完了した。次のフェーズP3-01「battle shell」へ進む。
 
 
 ## 16. P2-01「basic fixtures」完了記録
@@ -818,3 +818,10 @@ P2-01では、`tests/game-core/p2-01-fixtures.test.mjs`にFixture A〜Fの7契�
 P2-02では、tests/game-core/p2-02-adversarial-fixtures.test.mjsにX01〜X14の14契約試験を追加した。X01〜X03は境界の厳密判定・再通過・複数境界、X04〜X10は世界0、実効値、同率責任、盾、山札切れ、脆い世界の自己損傷、X11〜X12はフィールド上書きと消去順、X13〜X14は再送・古いrevision・不正入力を検証する。X03はクライアント命令ではなくeffect queue単体試験として分離し、X14は拒否前後のdeep snapshot、reasonCode、revisionを固定した。
 
 P2-01で追加された手番終了から次のTURN_STARTへのproduction executor接続も正本へ反映し、P2-01/P2-02をmain上で同じ手順で実行できるようにした。typecheckと全85件の試験が通過し、Sol・Highの独立レビューはAPPROVEとなった。次はP2-03「invariant / secrecy tests」へ進む。
+
+
+## 18. P2-03「invariant / secrecy tests」完了記録
+
+P2-03では、tests/game-core/p2-03-invariant-secrecy.test.mjsに11件の契約試験を追加した。カード実体の物理zone保存、体力・世界耐久の範囲、不正な状態の拒否、`revealedCards`の捨て札限定、応答待ちのpendingAction・pendingAttack整合性、効果キュー上限、初期12種類の全カード・全modeの合法性、FINISHED後の不変性とcommand再送を検証する。
+
+公開状態、応答待ち、preview、結果summaryについて、相手手札の順序・防御カードの有無・山札順・seed・乱数消費数・command履歴などの秘密情報だけを変えた状態と比較し、利用者向けの結果が変わらないことを固定した。実際にカードを引くpreviewは`HIDDEN_DRAW_IDENTITY`を返し、カードIDや定義を公開しない。typecheckと全96件の試験が通過し、次はP3-01「battle shell」へ進む。

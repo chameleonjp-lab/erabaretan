@@ -32,6 +32,7 @@
 - [game-core world boundaries / terminal / scoring V1](docs/24_GAME_CORE_WORLD_BOUNDARIES_TERMINAL_V1.md)
 - [game-core RNG / replay / state hash V1](docs/25_GAME_CORE_RNG_REPLAY_HASH_V1.md)
 - [game-core projection / preview / summary V1](docs/26_GAME_CORE_PROJECTION_PREVIEW_SUMMARY_V1.md)
+- [game-core invariant / secrecy tests V1](docs/27_GAME_CORE_INVARIANT_SECRECY_TESTS_V1.md)
 
 ### レビュー
 
@@ -47,7 +48,7 @@
 
 ## 現在の段階
 
-P2-02の敵対的Fixture X01〜X14契約試験が完了し、P2-03の不変条件・秘密情報試験へ進む段階です。
+P2-03の不変条件・秘密情報試験が完了し、P3-01の同一端末の戦闘画面の縦切り版へ進む段階です。
 
 P0-01として、[初期12種類カード仕様 V1](docs/16_INITIAL_12_CARD_SPEC_V1.md)を作成しました。カードの最終バランスではなく、12種類で中心体験を検証するための正本です。
 
@@ -82,10 +83,10 @@ P1-05として、[game-core projection / preview / summary V1](docs/26_GAME_CORE
 - 同時死亡、世界0、最大ラウンド、降参、切断の扱い
 - 決定的な乱数、リプレイ、秘密情報、ルール版固定の方針
 
-P0-01、P0-02、P0-03、P0-04、P0-05、P0-06、P1-01、P1-02、P1-03、P1-04、P1-04b、P1-05、P2-01、P2-02の実装は完了しました。P0-06の現行golden値、実行境界、manifest付属データを正本へ反映し、旧値は履歴として隔離しています。
+P0-01、P0-02、P0-03、P0-04、P0-05、P0-06、P1-01、P1-02、P1-03、P1-04、P1-04b、P1-05、P2-01、P2-02、P2-03の実装は完了しました。P0-06の現行golden値、実行境界、manifest付属データを正本へ反映し、旧値は履歴として隔離しています。
 
-P1-04bまでの決定性とハッシュ境界を維持したまま、P1-05で公開状態投影・preview・結果summaryを追加し、P2-01でFixture A〜F、P2-02で敵対的Fixture X01〜X14をproduction executorまたはeffect queue経由で自動化しました。次はP2-03の不変条件・秘密情報試験へ進みます。
+P1-04bまでの決定性とハッシュ境界を維持したまま、P1-05で公開状態投影・preview・結果summaryを追加し、P2-01でFixture A〜F、P2-02で敵対的Fixture X01〜X14、P2-03で不変条件・秘密情報試験を自動化しました。次はP3-01の同一端末の戦闘画面の縦切り版へ進みます。
 
-P2-02では、X01〜X14の境界再通過、複数境界、世界崩壊、同率責任、山札切れ、盾、フィールド上書き、重複命令、不正入力を契約試験へ固定しました。全85件の試験と型検査が通過し、Sol・Highの独立レビューも完了しています。
+P2-02では、X01〜X14の境界再通過、複数境界、世界崩壊、同率責任、山札切れ、盾、フィールド上書き、重複命令、不正入力を契約試験へ固定しました。P2-03では不変条件、効果キュー上限、初期12種類全modeの合法性、公開状態、応答待ち、preview、結果summaryの秘密情報境界を固定しました。手札・山札・解決中カードを公開履歴へ混入できないこと、実ドローpreviewが山札順を漏らさないことも確認しています。全96件の試験と型検査が通過し、Sol・Highの独立レビューを完了しています。
 
 通信機能からは作りません。面白さ、採点の納得感、決定的な再現性を確認した後、24種類のオフライン試作、36種類の完成品質確認版、合言葉オンライン対戦、48種類の限定公開版へ進みます。

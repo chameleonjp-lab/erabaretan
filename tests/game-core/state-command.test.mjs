@@ -3,6 +3,7 @@ import assert from "node:assert/strict";
 import {
   ALPHA_12_RULESET,
   applyCommand,
+  beginPendingAttack,
   createInitialGameState,
   openResponseSelection,
   validateCommand,
@@ -137,7 +138,12 @@ test("response selection accepts one response and returns to RESOLUTION", () => 
   ));
   assert.equal(played.accepted, true);
   if (!played.accepted) return;
-  const responseState = openResponseSelection(played.state, {
+  const responseState = openResponseSelection(beginPendingAttack(played.state, {
+    pendingAttackId: "pending.cmd-attack-001",
+    attackingPlayerId: "P1",
+    defendingPlayerId: "P2",
+    baseDamage: 3,
+  }), {
     kind: "RESPONSE_SELECTION",
     pendingAttackId: "pending.cmd-attack-001",
     commandId: "cmd-attack-001",

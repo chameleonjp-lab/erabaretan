@@ -189,6 +189,7 @@ function finishBySurrender(state: GameState, command: Extract<Command, { command
     state: {
       ...state,
       phase: "FINISHED" as const,
+      activePlayerId: null,
       revision,
       pendingAction: null,
       pendingAttack: null,

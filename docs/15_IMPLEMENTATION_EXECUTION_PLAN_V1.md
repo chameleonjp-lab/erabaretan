@@ -234,7 +234,7 @@ reduce(state, validatedCommand, rng)
 
 ### 4.0 P1-01 / P1-02の完了
 
-[P1-01正本](22_GAME_CORE_STATE_AND_COMMAND_BASE_V1.md)として、GameState、7種類のcommand型、validation、revision、再送防止、RESOLUTION割り込み拒否、カードzoneを実装した。[P1-02正本](23_GAME_CORE_EFFECTS_PAY_HP_V1.md)として、16種類の効果命令、原子的な効果キュー、盾・反射・世界耐久の基礎処理、`PAY_HP`、初期12枚の効果ビルダーを追加した。[P1-03正本](24_GAME_CORE_WORLD_BOUNDARIES_TERMINAL_V1.md)として、世界境界、フィールド自動効果、カード条件、終了判定、採点を追加した。[P1-04実装記録](25_GAME_CORE_RNG_REPLAY_HASH_V1.md)として、決定的乱数、初期配札、状態ハッシュ、本番相当の受理command列再生検証を追加した。[P1-04b](21_GOLDEN_MATCHES_AND_STATE_HASHES_V1.md)として、P0-06の現行golden値、実行境界、manifest付属データ、fixtureバイト列を実装へ整合させた。次にP1-05で公開状態投影、preview、summaryを追加する。
+[P1-01正本](22_GAME_CORE_STATE_AND_COMMAND_BASE_V1.md)として、GameState、7種類のcommand型、validation、revision、再送防止、RESOLUTION割り込み拒否、カードzoneを実装した。[P1-02正本](23_GAME_CORE_EFFECTS_PAY_HP_V1.md)として、16種類の効果命令、原子的な効果キュー、盾・反射・世界耐久の基礎処理、`PAY_HP`、初期12枚の効果ビルダーを追加した。[P1-03正本](24_GAME_CORE_WORLD_BOUNDARIES_TERMINAL_V1.md)として、世界境界、フィールド自動効果、カード条件、終了判定、採点を追加した。[P1-04実装記録](25_GAME_CORE_RNG_REPLAY_HASH_V1.md)として、決定的乱数、初期配札、状態ハッシュ、本番相当の受理command列再生検証を追加した。[P1-04b](21_GOLDEN_MATCHES_AND_STATE_HASHES_V1.md)として、P0-06の現行golden値、実行境界、manifest付属データ、fixtureバイト列を実装へ整合させた。[P1-05実装記録](26_GAME_CORE_PROJECTION_PREVIEW_SUMMARY_V1.md)として、公開状態投影、preview、summaryを追加し、秘密情報境界と既存決定性を検証した。次はP2-01の契約試験へ進む。
 
 ## 4.1 実装順
 
@@ -251,10 +251,10 @@ reduce(state, validatedCommand, rng)
 11. 神の評価
 12. 決定的乱数（P1-04で実装済み）
 13. リプレイと状態ハッシュ（P1-04で実装済み。P0-06実装整合訂正はP1-04bで完了）
-14. 公開状態への投影（P1-05）
+14. 公開状態への投影（P1-05で実装済み）
 15. event生成
-16. `previewCommand`（P1-05）
-17. `summarizeMatch`（P1-05）
+16. `previewCommand`（P1-05で実装済み）
+17. `summarizeMatch`（P1-05で実装済み）
 
 ## 4.2 絶対に依存させないもの
 
@@ -286,6 +286,8 @@ reduce(state, validatedCommand, rng)
 - RESOLUTION中のSURRENDERを拒否する
 - `PAY_HP`が防御・反射・シールドへ干渉しない
 - 公開状態に相手手札・山札順・未使用乱数が含まれない
+- previewが本番相当executorの確定差分だけを返し、秘密情報と元stateを変更しない
+- 正常・非正常終了のsummaryが採点整合性を検証して公開できる
 
 ---
 
@@ -682,7 +684,7 @@ P1-01 [state / command](22_GAME_CORE_STATE_AND_COMMAND_BASE_V1.md)
 P1-02 [effects / PAY_HP](23_GAME_CORE_EFFECTS_PAY_HP_V1.md)
 P1-03 thresholds / scoring
 P1-04 rng / replay / hash
-P1-05 projection / preview / summary
+P1-05 [projection / preview / summary](26_GAME_CORE_PROJECTION_PREVIEW_SUMMARY_V1.md)
 
 P2-01 basic fixtures
 P2-02 adversarial fixtures
@@ -803,4 +805,4 @@ P0完了判定後、P1-01からgame-core実装を開始した。P1-01〜P1-04b�
 
 以上をもって、企画レビューから実装計画への変換は完了とする。
 
-P1-01「純粋なstate / command基盤」、P1-02「effects / PAY_HP」、P1-03「thresholds / scoring」、P1-04「rng / replay / hash」、P1-04b「P0-06実装整合訂正」の決定性基盤実装は完了した。次のフェーズP1-05「projection / preview / summary」へ進む。
+P1-01「純粋なstate / command基盤」、P1-02「effects / PAY_HP」、P1-03「thresholds / scoring」、P1-04「rng / replay / hash」、P1-04b「P0-06実装整合訂正」、P1-05「projection / preview / summary」の実装は完了した。次のフェーズP2-01「basic fixtures」へ進む。

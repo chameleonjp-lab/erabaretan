@@ -27,3 +27,4 @@ export {
 export type { Alpha12SetupInput, Alpha12SetupResult } from "./setup/alpha-12.ts";
 
 export { executeAlpha12Command } from "./setup/alpha-12-command-executor.ts";
+export { previewAlpha12Command } from "./setup/alpha-12-preview.ts";

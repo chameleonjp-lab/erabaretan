@@ -71,8 +71,9 @@
 8. [game-core effects / PAY_HP](23_GAME_CORE_EFFECTS_PAY_HP_V1.md)
 9. [game-core world boundaries / terminal / scoring](24_GAME_CORE_WORLD_BOUNDARIES_TERMINAL_V1.md)
 10. [game-core RNG / replay / state hash](25_GAME_CORE_RNG_REPLAY_HASH_V1.md)
+11. [game-core projection / preview / summary](26_GAME_CORE_PROJECTION_PREVIEW_SUMMARY_V1.md)
 
-状態遷移、補充順、手札上限、命令受理、効果、世界境界、終了、採点、リプレイ、不変条件の詳細を扱う。
+状態遷移、補充順、手札上限、命令受理、効果、世界境界、終了、採点、リプレイ、公開情報境界、不変条件の詳細を扱う。
 
 ただし、統合計画V4で追加・変更した次の事項はV4を優先する。
 
@@ -269,6 +270,8 @@ P0では次を揃える。
 
 **P1-04b「P0-06 golden manifest・実行境界・fixtureバイト列の訂正」は完了。**
 
+**P1-05「公開状態投影・preview・summary」は完了。**
+
 正本：
 
 - [初期12種類カード仕様 V1](16_INITIAL_12_CARD_SPEC_V1.md)
@@ -282,4 +285,4 @@ P0では次を揃える。
 - [game-core world boundaries / terminal / scoring V1](24_GAME_CORE_WORLD_BOUNDARIES_TERMINAL_V1.md)
 - [game-core RNG / replay / state hash V1](25_GAME_CORE_RNG_REPLAY_HASH_V1.md)
 
-P1-03「thresholds / scoring」、P1-04「rng / replay / hash」、P1-04b「P0-06 golden manifest・実行境界・fixtureバイト列の訂正」の決定性基盤実装は完了した。旧ハッシュ値は履歴として隔離し、現行manifestを正本付属データとして扱う。次はP1-05「projection / preview / summary」へ進む。
+P1-03「thresholds / scoring」、P1-04「rng / replay / hash」、P1-04b「P0-06 golden manifest・実行境界・fixtureバイト列の訂正」、P1-05「projection / preview / summary」の実装は完了した。旧ハッシュ値は履歴として隔離し、現行manifestを正本付属データとして扱う。次はP2-01「basic fixtures」へ進む。

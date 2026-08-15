@@ -146,6 +146,12 @@ export function assertGameState(state: GameState): void {
     assertIntegerInRange(`${cardId}.drawOrder`, card.drawOrder, 0, Number.MAX_SAFE_INTEGER);
     const actualZone = findCardZone(state, cardId);
     if (actualZone !== card.zone) throw new Error(`card ${cardId} zone mismatch: ${card.zone} vs ${actualZone}`);
+    if (actualZone === "HAND" && state.cardZones.revealedCards.includes(cardId)) {
+      throw new Error(`revealed card ${cardId} cannot remain in a hand`);
+    }
+    if (state.cardZones.revealedCards.includes(cardId) && actualZone !== "DISCARD_PILE") {
+      throw new Error(`revealed card ${cardId} must be in the discard pile`);
+    }
     if (actualZone === "HAND") {
       const holder = playerIds.find((playerId) => state.cardZones.hands[playerId].includes(cardId));
       if (holder !== card.ownerPlayerId) {
@@ -192,6 +198,20 @@ export function assertGameState(state: GameState): void {
       throw new Error("RESPONSE_SELECTION requires a response pendingAction");
     }
     if (!state.respondingPlayerId) throw new Error("RESPONSE_SELECTION requires respondingPlayerId");
+    if (!state.pendingAttack) throw new Error("RESPONSE_SELECTION requires pendingAttack");
+    if (state.respondingPlayerId !== state.pendingAction.defendingPlayerId) {
+      throw new Error("RESPONSE_SELECTION respondingPlayerId must match the pending defender");
+    }
+    if (
+      state.pendingAttack.pendingAttackId !== state.pendingAction.pendingAttackId
+      || state.pendingAttack.attackingPlayerId !== state.pendingAction.attackingPlayerId
+      || state.pendingAttack.defendingPlayerId !== state.pendingAction.defendingPlayerId
+    ) {
+      throw new Error("RESPONSE_SELECTION pendingAttack must match pendingAction");
+    }
+  }
+  if (state.pendingAction?.kind === "RESPONSE_SELECTION" && state.phase !== "RESPONSE_SELECTION") {
+    throw new Error("response pendingAction requires RESPONSE_SELECTION phase");
   }
   if (state.phase === "FINISHED" && state.terminalFlags.endKind === null) {
     throw new Error("FINISHED requires an endKind");

@@ -9,6 +9,8 @@ import {
 } from "../../packages/game-core/src/index.ts";
 import {
   createAlpha12Setup,
+  INITIAL_12_CARD_DEFINITIONS,
+  buildInitial12CardEffects,
   executeAlpha12Command,
   previewAlpha12Command,
 } from "../../packages/content/src/index.ts";
@@ -110,6 +112,65 @@ function hiddenStateVariant(state) {
   };
 }
 
+function hiddenPresenceVariant(state) {
+  const hiddenHand = [...state.cardZones.hands.P2];
+  const hiddenHandCard = hiddenHand[0];
+  const defenseCardIndex = state.cardZones.drawPile.findIndex(
+    (id) => state.cardInstances[id].cardDefinitionId === "defense.guardian-veil.v1",
+  );
+  assert.ok(defenseCardIndex >= 0, "the deterministic draw pile must contain a defense card");
+  const defenseCard = state.cardZones.drawPile[defenseCardIndex];
+  hiddenHand[0] = defenseCard;
+  const drawPile = [...state.cardZones.drawPile];
+  drawPile[defenseCardIndex] = hiddenHandCard;
+  return {
+    ...state,
+    seed: "00112233445566778899aabbccddeeff",
+    randomConsumptionCount: state.randomConsumptionCount + 2,
+    players: {
+      ...state.players,
+      P2: { ...state.players.P2, hand: hiddenHand },
+    },
+    cardZones: {
+      ...state.cardZones,
+      drawPile,
+      hands: { ...state.cardZones.hands, P2: hiddenHand },
+    },
+    cardInstances: {
+      ...state.cardInstances,
+      [hiddenHandCard]: { ...state.cardInstances[hiddenHandCard], ownerPlayerId: "P1", zone: "DRAW_PILE" },
+      [defenseCard]: { ...state.cardInstances[defenseCard], ownerPlayerId: "P2", zone: "HAND" },
+    },
+    commandHistory: {
+      ...state.commandHistory,
+      "hidden-presence-marker": {
+        command: { hidden: "defense-card-presence" },
+        revisionBefore: 0,
+        revisionAfter: 0,
+        events: [],
+      },
+    },
+  };
+}
+
+function hiddenDrawOrderVariant(state) {
+  return {
+    ...state,
+    seed: "ffeeddccbbaa99887766554433221100",
+    randomConsumptionCount: state.randomConsumptionCount + 3,
+    cardZones: { ...state.cardZones, drawPile: [...state.cardZones.drawPile].reverse() },
+    commandHistory: {
+      ...state.commandHistory,
+      "hidden-draw-order-marker": {
+        command: { hidden: "draw-order" },
+        revisionBefore: 0,
+        revisionAfter: 0,
+        events: [],
+      },
+    },
+  };
+}
+
 function systemRevealEffect(ordinal) {
   return {
     effectId: `effect.p2-03-budget.${String(ordinal).padStart(4, "0")}`,
@@ -119,6 +180,46 @@ function systemRevealEffect(ordinal) {
     payload: { informationKind: "CARD_PLAYED" },
     attributionPolicy: "NO_LEDGER",
     executionTiming: "IMMEDIATE",
+  };
+}
+
+function cardInstanceForDefinition(state, cardDefinitionId, ownerPlayerId = "P1") {
+  const cardInstanceId = Object.values(state.cardInstances).find(
+    (card) => card.cardDefinitionId === cardDefinitionId && card.ownerPlayerId === ownerPlayerId,
+  )?.cardInstanceId;
+  assert.ok(cardInstanceId, `${ownerPlayerId} must have a source instance for ${cardDefinitionId}`);
+  return cardInstanceId;
+}
+
+function cardBudgetState(defendingPlayerId = "P2") {
+  const state = setupState("p2-03-card-budget");
+  const attackingPlayerId = defendingPlayerId === "P1" ? "P2" : "P1";
+  return {
+    ...state,
+    phase: "RESOLUTION",
+    activePlayerId: null,
+    respondingPlayerId: null,
+    world: { ...state.world, durability: 80, triggeredThresholds: [] },
+    activeField: {
+      fieldDefinitionId: "field.root-sanctuary.v1",
+      ownerPlayerId: "P2",
+      expiresAfterTurnSequence: state.turnSequence + 3,
+      lastFrenziedCardInstanceId: null,
+      rootSanctuaryUsedTurnSequence: null,
+    },
+    pendingAction: null,
+    pendingAttack: {
+      pendingAttackId: "p2-03-card-budget-attack",
+      attackingPlayerId,
+      defendingPlayerId,
+      baseDamage: 6,
+      responseCount: 0,
+      incomingDamageReduction: 0,
+      currentShield: 0,
+      effectiveDamage: null,
+      reflectionApplied: false,
+    },
+    effectQueue: [],
   };
 }
 
@@ -148,6 +249,21 @@ test("P2-03 invariants reject duplicate zones, out-of-range values, and broken p
   assert.throws(
     () => assertGameState({
       ...state,
+      cardZones: { ...state.cardZones, revealedCards: [cardInstanceId] },
+    }),
+    /cannot remain in a hand/,
+  );
+  const drawCardInstanceId = state.cardZones.drawPile[0];
+  assert.throws(
+    () => assertGameState({
+      ...state,
+      cardZones: { ...state.cardZones, revealedCards: [drawCardInstanceId] },
+    }),
+    /must be in the discard pile/,
+  );
+  assert.throws(
+    () => assertGameState({
+      ...state,
       players: { ...state.players, P1: { ...state.players.P1, hitPoints: -1 } },
     }),
     /P1\.hitPoints/,
@@ -163,6 +279,23 @@ test("P2-03 invariants reject duplicate zones, out-of-range values, and broken p
   assert.throws(
     () => assertGameState({ ...state, phase: "RESPONSE_SELECTION" }),
     /RESPONSE_SELECTION requires/,
+  );
+
+  const attackCard = cardInHand(state, "P1", "attack.rift-pebble.v1");
+  const pending = accepted(executeAlpha12Command(
+    { ...state, activePlayerId: "P1" },
+    play("p2-03-invalid-pending-attack", "P1", state.revision, attackCard, "P2"),
+  )).state;
+  assert.throws(
+    () => assertGameState({ ...pending, pendingAttack: null }),
+    /RESPONSE_SELECTION requires pendingAttack/,
+  );
+  assert.throws(
+    () => assertGameState({
+      ...pending,
+      pendingAttack: { ...pending.pendingAttack, attackingPlayerId: "P2", defendingPlayerId: "P1" },
+    }),
+    /pendingAttack must match pendingAction/,
   );
 });
 
@@ -217,6 +350,39 @@ test("P2-03 effect queue accepts the declared maximum and marks an over-budget q
     assert.equal(summary.summary.battle.status, "VOID");
     assert.equal(summary.summary.scoreStatus, "NOT_AWARDED");
     assert.equal(summary.summary.divineSelection.status, "NOT_AWARDED");
+  }
+});
+
+test("P2-03 every initial-12 card mode stays inside the effect budget", () => {
+  for (const definition of INITIAL_12_CARD_DEFINITIONS) {
+    for (const mode of Object.keys(definition.modes)) {
+      const state = cardBudgetState(mode === "RESPONSE" ? "P1" : "P2");
+      const sourceCardInstanceId = cardInstanceForDefinition(state, definition.cardDefinitionId, "P1");
+      const discardCardInstanceId = definition.cardDefinitionId === "intervention.careful-redraw.v1"
+        ? state.players.P1.hand.find((cardInstanceId) => cardInstanceId !== sourceCardInstanceId)
+        : undefined;
+      const effects = buildInitial12CardEffects({
+        resolutionId: `p2-03-card-budget-${definition.cardDefinitionId}-${mode.toLowerCase()}`,
+        cardDefinitionId: definition.cardDefinitionId,
+        cardInstanceId: sourceCardInstanceId,
+        ownerPlayerId: "P1",
+        mode,
+        targetPlayerId: "P2",
+        pendingAttackId: state.pendingAttack?.pendingAttackId,
+        discardCardInstanceId,
+        turnSequence: state.turnSequence,
+      });
+      assert.ok(effects.length <= state.ruleset.maxEffectsPerResolution, `${definition.cardDefinitionId}/${mode} exceeds the queue budget`);
+      const result = resolveEffectQueue(state, effects);
+      assert.equal(
+        result.committed,
+        true,
+        `${definition.cardDefinitionId}/${mode} must be a valid effect queue: ${result.rejectionCode ?? result.results.at(-1)?.rejectionCode ?? "unknown"}`,
+      );
+      assert.notEqual(result.state.terminalFlags.endKind, "INVALID_MATCH", `${definition.cardDefinitionId}/${mode} must not cause INVALID_MATCH`);
+      assert.equal(result.state.effectQueue.length, 0);
+      assertGameState(result.state);
+    }
   }
 });
 
@@ -275,14 +441,16 @@ test("P2-03 public projection hides every opponent hand and secret engine field"
 
 test("P2-03 public projection is identical when only hidden state changes", () => {
   const state = { ...setupState("p2-03-public-stability"), activePlayerId: "P1" };
-  const variant = hiddenStateVariant(state);
-  assert.notEqual(hashGameState(state), hashGameState(variant), "the hidden variants must be different authoritative states");
+  const variants = [hiddenStateVariant(state), hiddenPresenceVariant(state), hiddenDrawOrderVariant(state)];
 
-  for (const viewer of [
-    { kind: "PLAYER", playerId: "P1" },
-    { kind: "SPECTATOR" },
-  ]) {
-    assert.deepEqual(projectPublicState(state, viewer), projectPublicState(variant, viewer));
+  for (const variant of variants) {
+    assert.notEqual(hashGameState(state), hashGameState(variant), "the hidden variants must be different authoritative states");
+    for (const viewer of [
+      { kind: "PLAYER", playerId: "P1" },
+      { kind: "SPECTATOR" },
+    ]) {
+      assert.deepEqual(projectPublicState(state, viewer), projectPublicState(variant, viewer));
+    }
   }
 });
 
@@ -292,9 +460,10 @@ test("P2-03 response projection does not reveal which defense card the opponent 
   const pending = accepted(executeAlpha12Command(state, play("p2-03-response-attack", "P1", state.revision, attackCard, "P2"))).state;
   assert.equal(pending.phase, "RESPONSE_SELECTION");
   const publicState = projectPublicState(pending, { kind: "PLAYER", playerId: "P1" });
-  const hiddenVariant = hiddenStateVariant(pending);
-  const variantPublicState = projectPublicState(hiddenVariant, { kind: "PLAYER", playerId: "P1" });
-  assert.deepEqual(publicState, variantPublicState);
+  const variants = [hiddenStateVariant(pending), hiddenPresenceVariant(pending), hiddenDrawOrderVariant(pending)];
+  for (const variant of variants) {
+    assert.deepEqual(publicState, projectPublicState(variant, { kind: "PLAYER", playerId: "P1" }));
+  }
   assert.equal(publicState.ok, true);
   if (!publicState.ok) return;
   assert.equal(publicState.state.pendingInteraction?.kind, "RESPONSE_SELECTION");
@@ -307,7 +476,7 @@ test("P2-03 response projection does not reveal which defense card the opponent 
 
 test("P2-03 preview is pure and unchanged by hidden hand, seed, history, or random-count differences", () => {
   const state = { ...setupState("p2-03-preview-secrecy"), activePlayerId: "P1" };
-  const variant = hiddenStateVariant(state);
+  const variants = [hiddenStateVariant(state), hiddenPresenceVariant(state), hiddenDrawOrderVariant(state)];
   const discardCard = state.players.P1.hand[0];
   const attackCard = cardInHand(state, "P1", "attack.rift-pebble.v1");
   const intents = [
@@ -327,12 +496,39 @@ test("P2-03 preview is pure and unchanged by hidden hand, seed, history, or rand
   const beforeHash = hashGameState(state);
   for (const intent of intents) {
     const preview = previewAlpha12Command(state, { kind: "PLAYER", playerId: "P1" }, intent);
-    const variantPreview = previewAlpha12Command(variant, { kind: "PLAYER", playerId: "P1" }, intent);
-    assert.deepEqual(preview, variantPreview);
+    for (const variant of variants) {
+      assert.deepEqual(preview, previewAlpha12Command(variant, { kind: "PLAYER", playerId: "P1" }, intent));
+    }
     assert.notEqual(preview.status, "UNAVAILABLE");
   }
   assert.equal(JSON.stringify(state), before);
   assert.equal(hashGameState(state), beforeHash);
+});
+
+test("P2-03 preview marks a real draw as hidden and ignores draw-pile order", () => {
+  const state = { ...setupState("p2-03-preview-draw"), activePlayerId: "P1" };
+  const redrawCard = cardInHand(state, "P1", "intervention.careful-redraw.v1");
+  const discardCard = state.players.P1.hand.find((cardInstanceId) => cardInstanceId !== redrawCard);
+  assert.ok(discardCard, "careful-redraw requires another hand card");
+  const intent = {
+    commandType: "PLAY_CARD",
+    playerId: "P1",
+    payload: {
+      cardInstanceId: redrawCard,
+      playMode: "RELEASE",
+      discardCardInstanceId: discardCard,
+    },
+  };
+  const variant = hiddenDrawOrderVariant(state);
+  const preview = previewAlpha12Command(state, { kind: "PLAYER", playerId: "P1" }, intent);
+  const variantPreview = previewAlpha12Command(variant, { kind: "PLAYER", playerId: "P1" }, intent);
+  assert.deepEqual(preview, variantPreview);
+  assert.equal(preview.status, "READY");
+  if (preview.status !== "READY") return;
+  assert.equal(preview.certainty, "PARTIAL");
+  assert.deepEqual(preview.uncertainties, ["HIDDEN_DRAW_IDENTITY"]);
+  assert.equal(JSON.stringify(preview).includes("cardInstanceId"), false);
+  assert.equal(JSON.stringify(preview).includes("cardDefinitionId"), false);
 });
 
 test("P2-03 final summary is unchanged by hidden hand information", () => {

@@ -822,6 +822,6 @@ P2-01で追加された手番終了から次のTURN_STARTへのproduction execut
 
 ## 18. P2-03「invariant / secrecy tests」完了記録
 
-P2-03では、tests/game-core/p2-03-invariant-secrecy.test.mjsに9件の契約試験を追加した。カード実体の物理zone保存、体力・世界耐久の範囲、不正な状態の拒否、効果キュー上限、FINISHED後の不変性とcommand再送を検証する。
+P2-03では、tests/game-core/p2-03-invariant-secrecy.test.mjsに11件の契約試験を追加した。カード実体の物理zone保存、体力・世界耐久の範囲、不正な状態の拒否、`revealedCards`の捨て札限定、応答待ちのpendingAction・pendingAttack整合性、効果キュー上限、初期12種類の全カード・全modeの合法性、FINISHED後の不変性とcommand再送を検証する。
 
-公開状態、応答待ち、preview、結果summaryについて、相手手札・seed・乱数消費数・command履歴などの秘密情報だけを変えた状態と比較し、利用者向けの結果が変わらないことを固定した。typecheckと全94件の試験が通過し、次はP3-01「battle shell」へ進む。
+公開状態、応答待ち、preview、結果summaryについて、相手手札の順序・防御カードの有無・山札順・seed・乱数消費数・command履歴などの秘密情報だけを変えた状態と比較し、利用者向けの結果が変わらないことを固定した。実際にカードを引くpreviewは`HIDDEN_DRAW_IDENTITY`を返し、カードIDや定義を公開しない。typecheckと全96件の試験が通過し、次はP3-01「battle shell」へ進む。

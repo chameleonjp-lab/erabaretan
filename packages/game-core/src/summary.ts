@@ -72,6 +72,41 @@ function judgmentMatches(state: GameState): boolean {
   return expectedIds.every((playerId) => calculated.playerScores[playerId] === state.judgment?.playerScores[playerId]);
 }
 
+function hasOnlyKnownPlayerIds(state: GameState, playerIds: readonly PlayerId[]): boolean {
+  return new Set(playerIds).size === playerIds.length
+    && playerIds.every((playerId) => state.initialPlayerOrder.includes(playerId));
+}
+
+function terminalStateConsistent(state: GameState): boolean {
+  const flags = state.terminalFlags;
+  if (!hasOnlyKnownPlayerIds(state, flags.defeatedPlayerIds)) return false;
+  if (flags.battleWinnerId !== null && !state.initialPlayerOrder.includes(flags.battleWinnerId)) return false;
+  if (flags.divineSelectionWinnerId !== null && !state.initialPlayerOrder.includes(flags.divineSelectionWinnerId)) return false;
+  if (state.activePlayerId !== null || state.respondingPlayerId !== null) return false;
+  if (state.pendingAction !== null || state.pendingAttack !== null || state.effectQueue.length !== 0) return false;
+
+  if (flags.endKind === "NORMAL") {
+    const defeatedByHp = state.initialPlayerOrder.filter((playerId) => state.players[playerId].hitPoints <= 0);
+    const alive = state.initialPlayerOrder.filter((playerId) => !flags.defeatedPlayerIds.includes(playerId));
+    const expectedBattleWinner = alive.length === 1 ? alive[0] : null;
+    return flags.worldCollapsed === (state.world.durability === 0)
+      && flags.maxRoundsReached === (state.roundNumber > state.ruleset.maxRounds)
+      && flags.defeatedPlayerIds.length === defeatedByHp.length
+      && flags.defeatedPlayerIds.every((playerId, index) => playerId === defeatedByHp[index])
+      && flags.battleWinnerId === expectedBattleWinner;
+  }
+
+  if (state.judgment !== null || flags.divineSelectionWinnerId !== null) return false;
+  if (flags.endKind === "SURRENDER" || flags.endKind === "DISCONNECT_FORFEIT") {
+    if (flags.defeatedPlayerIds.length !== 1 || flags.battleWinnerId === null) return false;
+    return !flags.defeatedPlayerIds.includes(flags.battleWinnerId);
+  }
+  if (flags.endKind === "SERVER_ABORT" || flags.endKind === "INVALID_MATCH") {
+    return flags.battleWinnerId === null;
+  }
+  return false;
+}
+
 function playerSummaries(
   state: GameState,
   breakdown: Readonly<Record<PlayerId, { readonly survivalEvaluation: number; readonly worldEvaluation: number }>> | null,
@@ -131,6 +166,7 @@ export function summarizeMatch(state: GameState): MatchSummaryResult {
   } catch {
     return { ok: false, code: "TERMINAL_STATE_INCONSISTENT" };
   }
+  if (!terminalStateConsistent(state)) return { ok: false, code: "TERMINAL_STATE_INCONSISTENT" };
   const endKind = state.terminalFlags.endKind;
   if (endKind === null) return { ok: false, code: "TERMINAL_STATE_INCONSISTENT" };
   if (endKind === "NORMAL") {

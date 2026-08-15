@@ -204,7 +204,6 @@ export function assertGameState(state: GameState): void {
 export function findCardZone(state: GameState, cardInstanceId: CardInstanceId): CardZone {
   if (state.cardZones.drawPile.includes(cardInstanceId)) return "DRAW_PILE";
   if (state.cardZones.discardPile.includes(cardInstanceId)) return "DISCARD_PILE";
-  if (state.cardZones.revealedCards.includes(cardInstanceId)) return "REVEALED";
   if (state.cardZones.inResolution.includes(cardInstanceId)) return "RESOLUTION";
   for (const hand of Object.values(state.cardZones.hands)) {
     if (hand.includes(cardInstanceId)) return "HAND";

@@ -2,7 +2,9 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import {
   beginPendingAttack,
+  assertGameState,
   hashGameState,
+  previewCommand,
   projectPublicState,
   resolveEffectQueue,
   summarizeMatch,
@@ -183,6 +185,20 @@ test("public projection is stable when only hidden state changes", () => {
   assert.deepEqual(first, second);
 });
 
+test("revealed history cannot turn a physical hand card into a revealed zone", () => {
+  const state = createAlpha12Setup({ matchId: "p1-05-revealed-invariant", seed }).state;
+  const cardInstanceId = state.cardZones.hands.P1[0];
+  const invalid = {
+    ...state,
+    cardZones: { ...state.cardZones, revealedCards: [cardInstanceId] },
+    cardInstances: {
+      ...state.cardInstances,
+      [cardInstanceId]: { ...state.cardInstances[cardInstanceId], zone: "REVEALED" },
+    },
+  };
+  assert.throws(() => assertGameState(invalid), /zone mismatch/);
+});
+
 test("preview is pure, returns the production delta, and normalizes card probing", () => {
   const state = createAlpha12Setup({ matchId: "p1-05-preview", seed }).state;
   const playerId = state.activePlayerId;
@@ -236,6 +252,44 @@ test("preview is pure, returns the production delta, and normalizes card probing
     basedOnRevision: state.revision,
     code: "VIEWER_NOT_PLAYER",
   });
+});
+
+test("preview isolates a destructive executor from the authoritative state", () => {
+  const state = createAlpha12Setup({ matchId: "p1-05-preview-isolation", seed }).state;
+  const playerId = state.activePlayerId;
+  assert.ok(playerId);
+  const cardInstanceId = state.cardZones.hands[playerId][0];
+  const intent = {
+    commandType: "DISCARD_FOR_ACTION",
+    playerId,
+    payload: { cardInstanceId },
+  };
+  const before = JSON.stringify(state);
+  const beforeHash = hashGameState(state);
+  const result = previewCommand(
+    state,
+    { kind: "PLAYER", playerId },
+    intent,
+    (workingState, command) => {
+      workingState.cardInstances[cardInstanceId].zone = "DISCARD_PILE";
+      workingState.cardZones.inResolution.push(cardInstanceId);
+      workingState.pendingAttack = {
+        pendingAttackId: "destructive",
+        attackingPlayerId: playerId,
+        defendingPlayerId: state.initialPlayerOrder.find((id) => id !== playerId),
+        baseDamage: 1,
+        responseCount: 0,
+        incomingDamageReduction: 0,
+        currentShield: 0,
+        effectiveDamage: null,
+        reflectionApplied: false,
+      };
+      return { accepted: true, replayed: false, state: workingState, events: [] };
+    },
+  );
+  assert.equal(result.status, "UNAVAILABLE");
+  assert.equal(JSON.stringify(state), before);
+  assert.equal(hashGameState(state), beforeHash);
 });
 
 test("attack preview is partial and does not disclose response information", () => {
@@ -305,6 +359,12 @@ test("normal summaries preserve G01, G02, and G03 judgment facts", () => {
   assert.equal(g03Summary.summary.divineSelection.winnerId, "P2");
   assert.deepEqual(g03Summary.summary.players.map((player) => player.score), [-113, 2]);
   assert.deepEqual(g03Summary.summary.normalEndReasons, ["PLAYER_DEFEATED", "WORLD_COLLAPSED"]);
+
+  const inconsistent = {
+    ...second.state,
+    terminalFlags: { ...second.state.terminalFlags, defeatedPlayerIds: [] },
+  };
+  assert.deepEqual(summarizeMatch(inconsistent), { ok: false, code: "TERMINAL_STATE_INCONSISTENT" });
 });
 
 test("non-normal summaries do not award score or divine selection", () => {
@@ -328,4 +388,10 @@ test("non-normal summaries do not award score or divine selection", () => {
   assert.equal(summary.summary.divineSelection.status, "NOT_AWARDED");
   assert.deepEqual(summary.summary.players.map((player) => player.score), [null, null]);
   assert.deepEqual(summary.summary.players.map((player) => player.survivalEvaluation), [null, null]);
+
+  const invalidWinner = {
+    ...result.state,
+    terminalFlags: { ...result.state.terminalFlags, battleWinnerId: null },
+  };
+  assert.deepEqual(summarizeMatch(invalidWinner), { ok: false, code: "TERMINAL_STATE_INCONSISTENT" });
 });

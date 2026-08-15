@@ -256,6 +256,10 @@ function snapshotCommandHistory(state: GameState): string {
   return JSON.stringify(state.commandHistory);
 }
 
+function cloneState(state: GameState): GameState {
+  return JSON.parse(JSON.stringify(state)) as GameState;
+}
+
 function createDelta(before: GameState, after: GameState): PreviewDelta {
   const playerHitPointDeltas: Record<PlayerId, number> = {};
   const handCountDeltas: Record<PlayerId, number> = {};
@@ -321,7 +325,7 @@ export function previewCommand(
   const beforeHistory = snapshotCommandHistory(state);
   let execution: ReplayCommandExecution;
   try {
-    execution = executor(state, buildCommand(state, intent));
+    execution = executor(cloneState(state), buildCommand(state, intent));
   } catch {
     return unavailable(basedOnRevision, "INTERNAL_INCONSISTENCY");
   }

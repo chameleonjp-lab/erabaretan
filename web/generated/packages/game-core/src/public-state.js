@@ -109,6 +109,7 @@ function project(state, viewer) {
         publicStateVersion: PUBLIC_STATE_VERSION,
         matchId: state.matchId,
         rulesetId: state.ruleset.rulesetId,
+        handLimit: state.ruleset.handLimit,
         catalogHash: state.catalogHash,
         engineVersion: state.engineVersion,
         revision: state.revision,

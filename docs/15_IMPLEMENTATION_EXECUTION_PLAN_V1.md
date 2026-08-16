@@ -457,6 +457,10 @@ CPUは本人が見られる情報だけを使う。
 
 最初は高性能AIを作らず、合法手生成と簡単な評価関数から始める。
 
+### 7.1.1 P4-01 CPU合法手生成
+
+P4-01では、本人向け`PublicGameState`だけを入力にして、`ACTION_SELECTION`、`RESPONSE_SELECTION`、手札超過中の`TURN_START`から合法な候補を決定的に列挙する。`SURRENDER`は合法なプレイヤーcommandとして候補へ含め、`TIMEOUT_DEFAULT_ACTION`は期限管理側のシステム操作として除外する。commandId・revisionの付与は列挙と分離し、P4-02の評価関数、試合ループ、seed反復、統計収集は含めない。
+
 ## 7.2 自動対戦で記録するもの
 
 - seed
@@ -863,3 +867,8 @@ P3-04では、既存の`summarizeMatch`による正式な戦闘結果・採点�
 各コマンドの実行結果から、世界損傷、世界再生、世界境界、撃破、世界崩壊、HP支払いなど公開可能な事実だけを安全化し、コマンド単位のバッチとして画面セッション内へ保持する。同じ行動の損傷・境界・崩壊は重複表示せず、決着バッチ、最大損傷、最大再生、境界通過の候補から最大3件を発生順に表示する。手札・山札順・カードID・`effectId`・seed・乱数消費数・`commandHistory`は結果要約へ渡さない。
 
 P3-04専用の公開事実境界、最大3件、同一バッチ重複排除、時系列順、最大ラウンド・降参の最終状態フォールバックを試験へ固定した。型検査、静的Webビルド、既存試験、P3-01〜P3-04試験を通し、全111件が成功した。Sol・Highの設計レビューは条件付き採用となった。実ブラウザ・iPhone縦画面の手動確認は未実施である。
+
+
+## 23. P4-01「CPU legal actions」完了記録
+
+P4-01では、`PublicGameState`を入口にしたCPU合法手列挙、`materializeAlpha12CpuCommand`によるcommand化、公開状態用カード条件validator、`careful-redraw`の全捨て札候補、応答、`DISCARD_OVERFLOW`、`SURRENDER`を追加した。秘密の相手手札、山札順、seed、未使用乱数、command履歴は列挙へ渡さない。`tests/content/p4-01-cpu-legal-actions.test.mjs`で候補のvalidator受理・production executor受理・決定性・秘密情報差分を固定した。型検査、静的Webビルド、全115件の試験が成功し、Sol・Highの設計レビューはAPPROVEとなった。実ブラウザ・iPhone実機の手動確認は未実施である。次はP4-02「simulation metrics」へ進む。

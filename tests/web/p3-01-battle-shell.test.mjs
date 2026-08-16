@@ -1,17 +1,20 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
-import { createAlpha12Setup } from "../../packages/content/src/index.ts";
+import { createAlpha12Setup, previewAlpha12Command } from "../../packages/content/src/index.ts";
 import { projectPublicState } from "../../packages/game-core/src/index.ts";
 import { applyLocalCommand, createLocalMatch } from "../../web/src/local-match.ts";
 import {
   battlePrompt,
+  actionDescription,
+  cardDescription,
   effectHint,
   handoffTargetForStateChange,
   modeLabel,
   nextWorldBoundary,
   phaseLabel,
   roleLabel,
+  requiresActionConfirmation,
   screenForPhase,
 } from "../../web/src/battle-shell.ts";
 
@@ -40,6 +43,53 @@ test("P3-01 keeps the world and card vocabulary understandable", () => {
   assert.equal(modeLabel("RESTRAIN"), "抑制");
   assert.equal(nextWorldBoundary(projected.state), 75);
   assert.equal(effectHint(projected.state), "次の境界 75");
+});
+
+test("P3-02 explains card actions in plain language and confirms risky releases", () => {
+  assert.match(cardDescription("attack.star-breaker.v1"), /相手16/);
+  assert.match(cardDescription("field.frenzied-fracture.v1"), /1増やします/);
+  assert.match(cardDescription("field.root-sanctuary.v1"), /2減らします/);
+  assert.match(cardDescription("intervention.judgment-of-scars.v1"), /5以上/);
+  assert.equal(actionDescription("attack.star-breaker.v1", "RELEASE"), "相手へ16 / 世界へ7");
+  assert.equal(actionDescription("attack.star-breaker.v1", "RESTRAIN"), "次の攻撃を3軽減");
+  assert.equal(requiresActionConfirmation("attack.star-breaker.v1", "RELEASE"), true);
+  assert.equal(requiresActionConfirmation("attack.steadfast-strike.v1", "RELEASE"), false);
+  assert.equal(requiresActionConfirmation("attack.rift-pebble.v1", "RELEASE"), false);
+  assert.equal(requiresActionConfirmation("intervention.field-nullification.v1", "RELEASE"), false);
+  assert.equal(requiresActionConfirmation("intervention.oath-of-renewal.v1", "RELEASE"), false);
+});
+
+test("P3-02 uses the production preview without changing the local match", () => {
+  const state = createLocalMatch(5);
+  const playerId = state.activePlayerId;
+  assert.ok(playerId);
+  const cardInstanceId = state.players[playerId].hand.find(
+    (id) => state.cardInstances[id].cardDefinitionId === "attack.star-breaker.v1",
+  );
+  assert.ok(cardInstanceId);
+  const revision = state.revision;
+  const preview = previewAlpha12Command(state, { kind: "PLAYER", playerId }, {
+    commandType: "PLAY_CARD",
+    playerId,
+    payload: { cardInstanceId, playMode: "RELEASE", targetPlayerId: playerId === "P1" ? "P2" : "P1" },
+  });
+  assert.equal(preview.status, "READY");
+  if (preview.status !== "READY") return;
+  assert.equal(preview.certainty, "PARTIAL");
+  assert.equal(preview.pendingAttackBaseDamage, 16);
+  assert.equal(state.revision, revision);
+  assert.equal(state.phase, "ACTION_SELECTION");
+
+  const nullificationCard = state.players[playerId].hand.find(
+    (id) => state.cardInstances[id].cardDefinitionId === "intervention.field-nullification.v1",
+  );
+  assert.ok(nullificationCard);
+  const rejected = previewAlpha12Command(state, { kind: "PLAYER", playerId }, {
+    commandType: "PLAY_CARD",
+    playerId,
+    payload: { cardInstanceId: nullificationCard, playMode: "RELEASE" },
+  });
+  assert.equal(rejected.status, "REJECTED");
 });
 
 test("P3-01 explains whose action is needed without exposing the other hand", () => {
@@ -73,7 +123,15 @@ test("P3-01 inserts a private handoff before every new local viewer sees a hand"
   const styleSource = readFileSync(new URL("../../web/styles.css", import.meta.url), "utf8");
   assert.match(mainSource, /data-handoff-ready/);
   assert.match(mainSource, /data-discard-action/);
+  assert.match(mainSource, /data-confirm-action/);
+  assert.match(mainSource, /data-cancel-action/);
+  assert.match(mainSource, /data-response-card/);
+  assert.match(mainSource, /data-rematch/);
+  assert.match(mainSource, /card-description/);
   assert.match(styleSource, /\.card-action \{[^}]*min-height: 44px/s);
+  assert.match(styleSource, /\.mini-select select \{[^}]*min-height: 44px/s);
+  assert.match(styleSource, /body \{ min-width: 320px; overflow-x: hidden; \}/);
+  assert.match(styleSource, /\.hand-grid \{[^}]*repeat\(2, minmax\(0, 1fr\)\)/s);
 });
 
 test("P3-01 local adapter carries a real attack through response and result flow", () => {

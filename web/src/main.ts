@@ -7,17 +7,20 @@ import {
   projectPublicState,
   summarizeMatch,
 } from "../../packages/game-core/src/index.ts";
-import type { Command, GameState, PlayerId, PlayMode, PreviewCommandIntent } from "../../packages/game-core/src/index.ts";
+import type { Command, GameState, PlayerId, PlayMode, PreviewCommandIntent, PreviewResult } from "../../packages/game-core/src/index.ts";
 import type { DiscardCardPayload, PlayCardPayload } from "../../packages/game-core/src/commands/types.ts";
 import type { PublicCardRef, PublicGameState } from "../../packages/game-core/src/public-state.ts";
 import {
   battlePrompt,
+  actionDescription,
+  cardDescription,
   effectHint,
   handoffTargetForStateChange,
   modeLabel,
   phaseLabel,
   playerLabel,
   roleLabel,
+  requiresActionConfirmation,
   screenForPhase,
   viewerForGameState,
   type ShellScreen,
@@ -34,15 +37,25 @@ interface ShellState {
   screen: ShellScreen;
   state: GameState | null;
   handoffFor: PlayerId | null;
+  pendingAction: PendingActionConfirmation | null;
   notice: string;
   rematchNumber: number;
   commandNumber: number;
+}
+
+interface PendingActionConfirmation {
+  readonly command: Command;
+  readonly cardName: string;
+  readonly mode: PlayMode;
+  readonly actionText: string;
+  readonly previewText: string;
 }
 
 const shell: ShellState = {
   screen: "TITLE",
   state: null,
   handoffFor: null,
+  pendingAction: null,
   notice: "",
   rematchNumber: 0,
   commandNumber: 0,
@@ -93,6 +106,7 @@ function sendCommand(command: Command): void {
     return;
   }
   shell.state = result.state;
+  shell.pendingAction = null;
   shell.handoffFor = handoffTargetForStateChange(previousState, result.state);
   shell.notice = result.events.length > 0 ? "処理しました。" : "";
   shell.screen = screenForPhase(shell.state.phase);
@@ -120,6 +134,7 @@ function startBattle(): void {
   shell.rematchNumber += 1;
   const nextState = createLocalMatch(shell.rematchNumber);
   shell.state = nextState;
+  shell.pendingAction = null;
   shell.handoffFor = handoffTargetForStateChange(null, nextState);
   shell.notice = "同じ端末で交互に操作します。";
   shell.screen = "BATTLE";
@@ -130,11 +145,45 @@ function cardDefinition(card: PublicCardRef): InitialCardDefinition | null {
   return INITIAL_12_CARD_BY_ID[card.cardDefinitionId] ?? null;
 }
 
-function previewStatus(state: GameState, intent: PreviewCommandIntent): string {
-  const result = previewAlpha12Command(state, { kind: "PLAYER", playerId: currentViewerId(state) }, intent);
+function previewResult(state: GameState, intent: PreviewCommandIntent): PreviewResult {
+  return previewAlpha12Command(state, { kind: "PLAYER", playerId: currentViewerId(state) }, intent);
+}
+
+function previewStatusFromResult(result: PreviewResult): string {
   if (result.status === "READY") return result.certainty === "PARTIAL" ? "予測は一部未確定" : "実行できます";
   if (result.status === "REJECTED") return "今は使えません";
   return "予測できません";
+}
+
+function signed(value: number): string {
+  return value > 0 ? `+${value}` : String(value);
+}
+
+function previewLabel(state: GameState, intent: PreviewCommandIntent, result: PreviewResult): string {
+  if (result.status === "REJECTED") return "今は使えません";
+  if (result.status === "UNAVAILABLE") return "予測できません";
+
+  const parts: string[] = [];
+  if (intent.commandType === "PLAY_CARD" && result.certainty === "PARTIAL" && result.pendingAttackBaseDamage !== undefined) {
+    parts.push(`相手へ${result.pendingAttackBaseDamage}（応答で変化）`);
+  } else if (intent.commandType === "PLAY_CARD") {
+    const targetPlayerId = intent.payload.targetPlayerId ?? intent.playerId;
+    const hitPointDelta = result.delta.playerHitPointDeltas[targetPlayerId] ?? 0;
+    if (hitPointDelta !== 0) parts.push(`${targetPlayerId === intent.playerId ? "自分" : "相手"}HP ${signed(hitPointDelta)}`);
+  }
+  if (result.delta.worldDurabilityDelta < 0) parts.push(`世界へ${Math.abs(result.delta.worldDurabilityDelta)}`);
+  if (result.delta.worldDurabilityDelta > 0) parts.push(`世界へ${result.delta.worldDurabilityDelta}回復`);
+  if (result.delta.crossedWorldThresholds.length > 0) {
+    parts.push(`${result.delta.crossedWorldThresholds.join("・")}境界`);
+  }
+  if (intent.commandType === "DISCARD_FOR_ACTION") parts.push("この手番を終了");
+  if (parts.length === 0 && intent.commandType === "PLAY_CARD") {
+    const cardDefinitionId = state.cardInstances[intent.payload.cardInstanceId]?.cardDefinitionId;
+    parts.push(actionDescription(cardDefinitionId ?? "", intent.payload.playMode));
+  }
+  if (parts.length === 0) parts.push(previewStatusFromResult(result));
+  if (result.certainty === "PARTIAL") parts.push("一部未確定");
+  return parts.join(" / ");
 }
 
 function renderCardActions(state: GameState, card: PublicCardRef, definition: InitialCardDefinition): string {
@@ -145,7 +194,9 @@ function renderCardActions(state: GameState, card: PublicCardRef, definition: In
       playerId: viewerId,
       payload: { cardInstanceId: card.cardInstanceId, responseMode: "RESPONSE" },
     };
-    return `<button class="card-action" data-response-card="${escapeHtml(card.cardInstanceId)}" title="${escapeHtml(previewStatus(state, intent))}">応答する</button>`;
+    const result = previewResult(state, intent);
+    const disabled = shell.pendingAction || result.status === "REJECTED" ? " disabled" : "";
+    return `<div class="action-row"><button class="card-action" data-response-card="${escapeHtml(card.cardInstanceId)}" title="${escapeHtml(previewStatusFromResult(result))}"${disabled}>応答する</button><span class="action-hint">${escapeHtml(actionDescription(definition.cardDefinitionId, "RESPONSE"))}</span></div>`;
   }
   if (state.phase !== "ACTION_SELECTION" || state.activePlayerId !== viewerId) return "";
 
@@ -177,14 +228,18 @@ function renderCardActions(state: GameState, card: PublicCardRef, definition: In
         ...(discardCardId ? { discardCardInstanceId: discardCardId } : {}),
       },
     };
-    return `<button class="card-action" data-play-card="${escapeHtml(card.cardInstanceId)}" data-play-mode="${escapeHtml(mode)}" data-target-player="${escapeHtml(target)}" title="${escapeHtml(previewStatus(state, intent))}">${escapeHtml(modeLabel(mode))}</button>`;
+    const result = previewResult(state, intent);
+    const disabled = shell.pendingAction || result.status === "REJECTED" ? " disabled" : "";
+    return `<div class="action-row"><button class="card-action" data-play-card="${escapeHtml(card.cardInstanceId)}" data-play-mode="${escapeHtml(mode)}" data-target-player="${escapeHtml(target)}" title="${escapeHtml(previewStatusFromResult(result))}"${disabled}>${escapeHtml(modeLabel(mode))}</button><span class="action-hint">${escapeHtml(previewLabel(state, intent, result))}</span></div>`;
   }).join("");
   const discardIntent: PreviewCommandIntent = {
     commandType: "DISCARD_FOR_ACTION",
     playerId: viewerId,
     payload: { cardInstanceId: card.cardInstanceId },
   };
-  const discardButton = `<button class="card-action" data-discard-action="${escapeHtml(card.cardInstanceId)}" title="${escapeHtml(previewStatus(state, discardIntent))}">捨てて終了</button>`;
+  const discardResult = previewResult(state, discardIntent);
+  const disabled = shell.pendingAction || discardResult.status === "REJECTED" ? " disabled" : "";
+  const discardButton = `<div class="action-row"><button class="card-action" data-discard-action="${escapeHtml(card.cardInstanceId)}" title="${escapeHtml(previewStatusFromResult(discardResult))}"${disabled}>捨てて終了</button><span class="action-hint">この手番を終了</span></div>`;
   return `${select}<div class="card-actions">${buttons}${discardButton}</div>`;
 }
 
@@ -194,7 +249,7 @@ function renderCard(state: GameState, card: PublicCardRef): string {
   return `<article class="hand-card">
     <div class="card-topline"><span class="card-role">${escapeHtml(roleLabel(definition.role))}</span><span class="card-impact ${escapeHtml(definition.worldImpactType.toLowerCase())}">${escapeHtml(definition.worldImpactType === "DAMAGE" ? "世界-" : definition.worldImpactType === "RESTORE" ? "世界+" : "中立")}</span></div>
     <h3>${escapeHtml(definition.displayName)}</h3>
-    <p class="card-id">${escapeHtml(card.cardDefinitionId)}</p>
+    <p class="card-description">${escapeHtml(cardDescription(definition.cardDefinitionId))}</p>
     ${renderCardActions(state, card, definition)}
   </article>`;
 }
@@ -220,9 +275,16 @@ function renderWorld(publicState: PublicGameState): string {
   </section>`;
 }
 
+function renderPendingAction(): string {
+  const pending = shell.pendingAction;
+  if (!pending) return "";
+  return `<section class="decision-panel confirm-panel" aria-live="polite"><span class="eyebrow">行動確認</span><h2>${escapeHtml(pending.cardName)} / ${escapeHtml(modeLabel(pending.mode))}</h2><p>${escapeHtml(pending.actionText)}</p><p class="confirm-preview">${escapeHtml(pending.previewText)}</p><div class="confirm-actions"><button class="primary-button" data-confirm-action>この行動を実行</button><button class="secondary-button" data-cancel-action>やめる</button></div></section>`;
+}
+
 function renderBattleControls(state: GameState, publicState: PublicGameState, viewerId: PlayerId): string {
   const ownPlayer = publicState.players.find((player) => player.playerId === viewerId);
   const ownCards = ownPlayer?.hand.cards ?? [];
+  if (shell.pendingAction) return renderPendingAction();
   if (state.phase === "RESPONSE_SELECTION") {
     const attack = publicState.pendingInteraction;
     return `<section class="decision-panel response-panel"><span class="eyebrow">応答選択</span><h2>${escapeHtml(battlePrompt(publicState, viewerId))}</h2><p>相手の攻撃力：<strong>${attack?.baseDamage ?? "未確定"}</strong></p><button class="secondary-button" data-accept-damage>そのまま受ける</button></section>`;
@@ -244,7 +306,7 @@ function renderBattle(): string {
   const ownPlayer = publicState.players.find((player) => player.playerId === viewerId);
   const hand = ownPlayer?.hand.cards ?? [];
   return `<main class="screen battle-screen">
-    <header class="topbar"><div><span class="eyebrow">エラバレタン / P3-01</span><h1>砕けゆく原初界</h1></div><span class="phase-chip">${escapeHtml(phaseLabel(publicState.phase))}</span></header>
+    <header class="topbar"><div><span class="eyebrow">エラバレタン / P3-02</span><h1>砕けゆく原初界</h1></div><span class="phase-chip">${escapeHtml(phaseLabel(publicState.phase))}</span></header>
     ${renderWorld(publicState)}
     ${renderPlayers(publicState)}
     <section class="decision-area">${renderBattleControls(shell.state, publicState, viewerId)}</section>
@@ -274,7 +336,7 @@ function renderResult(): string {
 }
 
 function renderTitle(): string {
-  return `<main class="screen title-screen"><div class="title-mark"><span class="eyebrow">短時間対戦カードゲーム</span><h1>エラバレタン</h1><p>相手を倒すか、世界を守るか。最後に神が戦い方を査定します。</p></div><div class="title-actions"><button class="primary-button wide" data-world-law>世界律を確認する</button><p class="small-note">P3-01 同一端末試作 / 2人で交互に操作</p></div></main>`;
+  return `<main class="screen title-screen"><div class="title-mark"><span class="eyebrow">短時間対戦カードゲーム</span><h1>エラバレタン</h1><p>相手を倒すか、世界を守るか。最後に神が戦い方を査定します。</p></div><div class="title-actions"><button class="primary-button wide" data-world-law>世界律を確認する</button><p class="small-note">P3-02 手札・行動確認 / 2人で交互に操作</p></div></main>`;
 }
 
 function renderWorldLaw(): string {
@@ -316,6 +378,17 @@ app.addEventListener("click", (event) => {
     render();
     return;
   }
+  if (target.dataset.cancelAction !== undefined) {
+    shell.pendingAction = null;
+    render();
+    return;
+  }
+  if (target.dataset.confirmAction !== undefined) {
+    const pending = shell.pendingAction;
+    shell.pendingAction = null;
+    if (pending) sendCommand(pending.command);
+    return;
+  }
   if (!shell.state) return;
   const viewerId = currentViewerId(shell.state);
   if (target.dataset.surrender !== undefined) {
@@ -343,12 +416,36 @@ app.addEventListener("click", (event) => {
     const discardSelect = Array.from(app.querySelectorAll<HTMLSelectElement>("[data-redraw-select]"))
       .find((select) => select.dataset.redrawSelect === target.dataset.playCard);
     const targetPlayer = target.dataset.targetPlayer || undefined;
-    sendCommand(actionCommand("PLAY_CARD", viewerId, {
+    const playPayload: PlayCardPayload = {
       cardInstanceId: target.dataset.playCard,
       playMode: target.dataset.playMode as PlayMode,
       ...(targetPlayer ? { targetPlayerId: targetPlayer as PlayerId } : {}),
       ...(definitionId === "intervention.careful-redraw.v1" && discardSelect?.value ? { discardCardInstanceId: discardSelect.value } : {}),
-    }));
+    };
+    const playIntent: PreviewCommandIntent = {
+      commandType: "PLAY_CARD",
+      playerId: viewerId,
+      payload: playPayload,
+    };
+    const command = actionCommand("PLAY_CARD", viewerId, playPayload);
+    if (definitionId && requiresActionConfirmation(definitionId, playPayload.playMode)) {
+      const preview = previewResult(shell.state, playIntent);
+      if (preview.status === "REJECTED") {
+        shell.notice = "この行動は今は使えません。カードの条件を確認してください。";
+        render();
+        return;
+      }
+      shell.pendingAction = {
+        command,
+        cardName: INITIAL_12_CARD_BY_ID[definitionId]?.displayName ?? definitionId,
+        mode: playPayload.playMode,
+        actionText: cardDescription(definitionId),
+        previewText: previewLabel(shell.state, playIntent, preview),
+      };
+      render();
+      return;
+    }
+    sendCommand(command);
   }
 });
 

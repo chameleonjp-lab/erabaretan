@@ -825,3 +825,14 @@ P2-01で追加された手番終了から次のTURN_STARTへのproduction execut
 P2-03では、tests/game-core/p2-03-invariant-secrecy.test.mjsに11件の契約試験を追加した。カード実体の物理zone保存、体力・世界耐久の範囲、不正な状態の拒否、`revealedCards`の捨て札限定、応答待ちのpendingAction・pendingAttack整合性、効果キュー上限、初期12種類の全カード・全modeの合法性、FINISHED後の不変性とcommand再送を検証する。
 
 公開状態、応答待ち、preview、結果summaryについて、相手手札の順序・防御カードの有無・山札順・seed・乱数消費数・command履歴などの秘密情報だけを変えた状態と比較し、利用者向けの結果が変わらないことを固定した。実際にカードを引くpreviewは`HIDDEN_DRAW_IDENTITY`を返し、カードIDや定義を公開しない。typecheckと全96件の試験が通過し、次はP3-01「battle shell」へ進む。
+
+
+## 19. P3-01「battle shell」完了記録
+
+P3-01では、`web/index.html`、`web/styles.css`、`web/src/main.ts`、`web/src/local-match.ts`、`web/src/battle-shell.ts`を追加し、初期12種類のproduction content executorを同じ端末のブラウザ画面へ接続した。画面はタイトル、世界律確認、端末受け渡し確認、対戦、応答、神の審定、再戦の順で進む。
+
+操作中のプレイヤー以外の手札は`projectPublicState`で非公開にし、開始時・攻撃応答時・手番交代時・再戦時には端末を渡す確認画面を挟む。解放、抑制、カードを1枚捨てて手番終了、防御、そのまま受ける、手札整理、降参、再戦を操作できる。通常破棄後の次手番開始と最大10ラウンド終了は、production terminal resolverを通している。
+
+`web/generated/`には静的配信で読み込めるJavaScriptを生成し、`scripts/build-web.mjs`で再生成できるようにした。型検査、静的Webビルド、P3-01を含む全102件の試験が通過し、Sol・Highの独立再レビューはAPPROVEとなった。
+
+この段階では実ブラウザ自動化とiPhone実機手動確認が未実施である。公開前に320px/390pxの縦画面、文字サイズ、カード操作、受け渡しから結果までの一試合を確認する。次はP3-02「hand / action UX」へ進む。

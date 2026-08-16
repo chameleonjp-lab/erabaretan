@@ -4,7 +4,8 @@
   "type": "module",
   "scripts": {
     "test": "node --experimental-strip-types --test",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "build:web": "node scripts/build-web.mjs"
   },
   "devDependencies": {
     "typescript": "^5.9.0"

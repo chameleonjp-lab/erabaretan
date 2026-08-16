@@ -47,6 +47,45 @@ export function modeLabel(mode) {
         default: return mode;
     }
 }
+const CARD_DESCRIPTIONS = {
+    "attack.steadfast-strike.v1": "相手に6ダメージ。世界は傷つけません。",
+    "attack.star-breaker.v1": "解放で相手16・世界7。抑制で次に受ける攻撃を3軽減します。",
+    "attack.rift-pebble.v1": "解放で相手4・世界2。抑制で次に受ける攻撃を1軽減します。",
+    "defense.guardian-veil.v1": "応答で、いま受けている攻撃を7防ぎます。",
+    "defense.ashen-bulwark.v1": "応答で、いま受けている攻撃を12防ぎますが、世界4を傷つけます。",
+    "intervention.verdant-bargain.v1": "応答で攻撃を3軽減し、世界を4回復します。",
+    "intervention.oath-of-renewal.v1": "自分の体力4を支払い、世界を7回復します。",
+    "intervention.judgment-of-scars.v1": "解放は、相手の世界損傷責任が5以上のとき相手に8。抑制は相手に3ダメージです。",
+    "field.frenzied-fracture.v1": "共有フィールドを置き換え、解放による世界損傷を1増やします。",
+    "field.root-sanctuary.v1": "共有フィールドを置き換え、各手番の最初の世界損傷を2減らします。",
+    "intervention.field-nullification.v1": "共有フィールドを消去し、世界を2傷つけます。",
+    "intervention.careful-redraw.v1": "手札を1枚捨て、山札から1枚引きます。",
+};
+const ACTION_DESCRIPTIONS = {
+    "attack.steadfast-strike.v1": { RELEASE: "相手へ6" },
+    "attack.star-breaker.v1": { RELEASE: "相手へ16 / 世界へ7", RESTRAIN: "次の攻撃を3軽減" },
+    "attack.rift-pebble.v1": { RELEASE: "相手へ4 / 世界へ2", RESTRAIN: "次の攻撃を1軽減" },
+    "defense.guardian-veil.v1": { RESPONSE: "攻撃を7防ぐ" },
+    "defense.ashen-bulwark.v1": { RESPONSE: "攻撃を12防ぐ / 世界へ4" },
+    "intervention.verdant-bargain.v1": { RESPONSE: "攻撃を3軽減 / 世界へ4回復" },
+    "intervention.oath-of-renewal.v1": { RELEASE: "体力を4支払い / 世界へ7回復" },
+    "intervention.judgment-of-scars.v1": { RELEASE: "条件成立時、相手へ8", RESTRAIN: "相手へ3" },
+    "field.frenzied-fracture.v1": { RELEASE: "共有フィールドを置換" },
+    "field.root-sanctuary.v1": { RELEASE: "共有フィールドを置換" },
+    "intervention.field-nullification.v1": { RELEASE: "フィールド消去 / 世界へ2" },
+    "intervention.careful-redraw.v1": { RELEASE: "手札を交換" },
+};
+export function cardDescription(cardDefinitionId) {
+    return CARD_DESCRIPTIONS[cardDefinitionId] ?? "このカードの効果を確認してください。";
+}
+export function actionDescription(cardDefinitionId, mode) {
+    return ACTION_DESCRIPTIONS[cardDefinitionId]?.[mode] ?? modeLabel(mode);
+}
+export function requiresActionConfirmation(cardDefinitionId, mode) {
+    return mode === "RELEASE" && new Set([
+        "attack.star-breaker.v1",
+    ]).has(cardDefinitionId);
+}
 export function battlePrompt(state, viewerPlayerId) {
     if (state.phase === "RESPONSE_SELECTION") {
         return state.respondingPlayerId === viewerPlayerId

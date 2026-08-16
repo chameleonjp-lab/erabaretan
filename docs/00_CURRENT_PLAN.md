@@ -74,6 +74,7 @@
 11. [game-core projection / preview / summary](26_GAME_CORE_PROJECTION_PREVIEW_SUMMARY_V1.md)
 12. [game-core invariant / secrecy tests](27_GAME_CORE_INVARIANT_SECRECY_TESTS_V1.md)
 13. [game-core battle shell](28_GAME_CORE_BATTLE_SHELL_V1.md)
+14. [battle hand / action UX](29_BATTLE_HAND_ACTION_UX_V1.md)
 
 状態遷移、補充順、手札上限、命令受理、効果、世界境界、終了、採点、リプレイ、公開情報境界、不変条件の詳細を扱う。
 
@@ -282,6 +283,8 @@ P0では次を揃える。
 
 **P3-01「同一端末battle shell」は実装・自動検証完了。端末受け渡し、カード破棄、応答、最大ラウンド終了、結果表示、再戦を含む。実ブラウザ・iPhone実機確認は未実施。**
 
+**P3-02「手札・行動UX」は実装・自動検証完了。カード説明、行動効果、重要行動の確認、使えない行動の無効化を含む。実ブラウザ・iPhone実機確認は未実施。**
+
 正本：
 
 - [初期12種類カード仕様 V1](16_INITIAL_12_CARD_SPEC_V1.md)
@@ -295,4 +298,4 @@ P0では次を揃える。
 - [game-core world boundaries / terminal / scoring V1](24_GAME_CORE_WORLD_BOUNDARIES_TERMINAL_V1.md)
 - [game-core RNG / replay / state hash V1](25_GAME_CORE_RNG_REPLAY_HASH_V1.md)
 
-P1-03「thresholds / scoring」、P1-04「rng / replay / hash」、P1-04b「P0-06 golden manifest・実行境界・fixtureバイト列の訂正」、P1-05「projection / preview / summary」、P2-01「basic fixtures」、P2-02「adversarial fixtures」、P2-03「invariant / secrecy tests」、P3-01「battle shell」の実装は完了した。旧ハッシュ値は履歴として隔離し、現行manifestを正本付属データとして扱う。次は実ブラウザ・iPhone縦画面の確認後にP3-02「hand / action UX」へ進む。
+P1-03「thresholds / scoring」、P1-04「rng / replay / hash」、P1-04b「P0-06 golden manifest・実行境界・fixtureバイト列の訂正」、P1-05「projection / preview / summary」、P2-01「basic fixtures」、P2-02「adversarial fixtures」、P2-03「invariant / secrecy tests」、P3-01「battle shell」、P3-02「hand / action UX」の実装は完了した。旧ハッシュ値は履歴として隔離し、現行manifestを正本付属データとして扱う。次は実ブラウザ・iPhone縦画面の確認後にP3-03「world preview / judgment hint」へ進む。

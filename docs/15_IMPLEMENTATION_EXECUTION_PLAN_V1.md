@@ -836,3 +836,12 @@ P3-01では、`web/index.html`、`web/styles.css`、`web/src/main.ts`、`web/src
 `web/generated/`には静的配信で読み込めるJavaScriptを生成し、`scripts/build-web.mjs`で再生成できるようにした。型検査、静的Webビルド、P3-01を含む全102件の試験が通過し、Sol・Highの独立再レビューはAPPROVEとなった。
 
 この段階では実ブラウザ自動化とiPhone実機手動確認が未実施である。公開前に320px/390pxの縦画面、文字サイズ、カード操作、受け渡しから結果までの一試合を確認する。次はP3-02「hand / action UX」へ進む。
+
+
+## 20. P3-02「hand / action UX」完了記録
+
+P3-02では、`web/src/battle-shell.ts`に初期12種類のカード説明と行動説明を追加し、`web/src/main.ts`で手札の各行動の要点を表示した。カードIDを前面に出さず、相手へ与える値、世界への影響、次の攻撃への軽減、フィールドの追加効果、カード条件を日本語で示す。
+
+production previewが拒否した行動は押せないようにし、世界損傷7を直接与える「星砕き」の解放だけ実行前の確認画面を出す。確認中は他の手札操作を止め、実行または取消を選べる。手札交換の選択欄を含む操作領域は44px以上にした。
+
+型検査、静的Webビルド、既存試験、P3-01/P3-02試験を通し、全104件が成功した。Sol・Highの独立再レビューはAPPROVEとなった。実ブラウザ・iPhone縦画面の手動確認は未実施である。次は実画面確認後、P3-03「world preview / judgment hint」へ進む。

@@ -7,12 +7,12 @@ const responseCondition = {
     phase: "RESPONSE_SELECTION",
     requiresPendingAttackDefender: true,
 };
-const damagePlayer = (amount, target) => ({
+const damagePlayer = (amount, target, executionTiming = "AFTER_RESPONSE_MODIFIERS") => ({
     commandType: "DAMAGE_PLAYER",
     target,
     payload: { amount, damageKind: "DIRECT" },
     attributionPolicy: "NO_LEDGER",
-    executionTiming: "AFTER_RESPONSE_MODIFIERS",
+    executionTiming,
 });
 const damageWorld = (amount) => ({
     commandType: "DAMAGE_WORLD",
@@ -120,7 +120,10 @@ export const INITIAL_12_CARD_DEFINITIONS = [
         role: "INTERVENTION",
         worldImpactType: "NEUTRAL",
         copiesInDeck: 3,
-        modes: { RELEASE: [damagePlayer(8, "OPPONENT")], RESTRAIN: [damagePlayer(3, "OPPONENT")] },
+        modes: {
+            RELEASE: [damagePlayer(8, "OPPONENT", "IMMEDIATE")],
+            RESTRAIN: [damagePlayer(3, "OPPONENT", "IMMEDIATE")],
+        },
         conditions: { RELEASE: { ...actionTargetCondition, opponentWorldDamageResponsibilityAtLeast: 5 }, RESTRAIN: actionTargetCondition },
     },
     {

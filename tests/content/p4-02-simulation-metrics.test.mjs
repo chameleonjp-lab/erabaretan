@@ -104,3 +104,20 @@ test("P4-02 advances DISCARD_FOR_ACTION through TURN_END at the max-round bounda
   assert.equal(match.finalRoundNumber, 11);
   assert.equal(match.actionDecisionCount, match.playedCardCount + match.discardForActionCount);
 });
+
+
+test("P4-02 finalizes a max-round match when the executor reaches TURN_START after the last round", () => {
+  const report = runAlpha12Simulation({
+    seeds: ["00000000000000000000000000000008"],
+    matchIdPrefix: "p4-02-turn-start-max-round",
+  });
+  const [match] = report.matches;
+  assert.equal(match.endKind, "NORMAL");
+  assert.equal(match.maxRoundsReached, true);
+  assert.equal(match.rounds, 10);
+  assert.equal(match.finalRoundNumber, 11);
+  assert.equal(match.playedCardCount, 20);
+  assert.equal(match.actionDecisionCount, 20);
+  assert.equal(match.cardUseCount, 25);
+  assert.equal(match.finalStateHash, "3497da33873c2e5bee60d73ce850a69407449d6e160db17610e925ba30366cf6");
+});

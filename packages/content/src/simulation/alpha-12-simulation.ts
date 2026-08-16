@@ -86,7 +86,7 @@ export interface Alpha12SimulationMatchRecord {
   readonly oathOfRenewalUseCount: number;
   readonly oathOfRenewalSurvivalCount: number;
   readonly discardForActionCount: number;
-  /** PLAY_CARD, DISCARD_FOR_ACTION, and SURRENDER decisions in ACTION_SELECTION. */
+  /** PLAY_CARD and DISCARD_FOR_ACTION decisions in ACTION_SELECTION. */
   readonly actionDecisionCount: number;
 }
 

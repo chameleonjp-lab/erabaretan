@@ -1,5 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
 import { collectPublicFactBatch, composeResultJudgment } from "../../web/src/result-summary.ts";
 
 function summary(overrides = {}) {
@@ -86,4 +87,30 @@ test("P3-04 falls back to terminal facts when no event batch was retained", () =
   }), []);
   assert.deepEqual(surrender.turningPoints.map((point) => point.kind), ["SURRENDER"]);
   assert.deepEqual(surrender.turningPoints[0].playerIds, ["P1"]);
+});
+
+test("P3-04 prioritizes the decisive batch before chronological display order", () => {
+  const batches = [
+    collectPublicFactBatch([{ type: "WORLD_THRESHOLD_TRIGGERED", details: { threshold: 75 } }], ["P1", "P2"]),
+    collectPublicFactBatch([{ type: "DAMAGE_WORLD_APPLIED", details: { ownerPlayerId: "P1", effective: 8 } }], ["P1", "P2"]),
+    collectPublicFactBatch([{ type: "RESTORE_WORLD_APPLIED", details: { ownerPlayerId: "P2", effective: 5 } }], ["P1", "P2"]),
+    collectPublicFactBatch([{ type: "PLAYER_DEFEATED", details: { playerId: "P1" } }], ["P1", "P2"]),
+  ];
+  const result = composeResultJudgment(summary(), batches);
+  assert.deepEqual(result.turningPoints.map((point) => point.kind), ["WORLD_DAMAGE", "WORLD_RESTORE", "PLAYER_DEFEATED"]);
+  assert.deepEqual(result.turningPoints.map((point) => point.batchIndex), [1, 2, 3]);
+});
+
+test("P3-04 keeps the result DOM order aligned with the specification", () => {
+  const source = readFileSync(new URL("../../web/src/main.ts", import.meta.url), "utf8");
+  const positions = [
+    source.indexOf('class="result-reason"'),
+    source.indexOf("戦闘勝者"),
+    source.indexOf('class="score-table"'),
+    source.indexOf("renderTurningPoints(resultJudgment.turningPoints)"),
+    source.indexOf("result-selection"),
+    source.indexOf("data-rematch"),
+  ];
+  assert.ok(positions.every((position) => position >= 0));
+  assert.deepEqual([...positions].sort((left, right) => left - right), positions);
 });

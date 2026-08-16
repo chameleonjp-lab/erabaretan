@@ -165,7 +165,8 @@ export function composeResultJudgment(summary, batches) {
         });
     }
     const hasWorldCollapsePoint = candidates.some((candidate) => candidate.kind === "WORLD_COLLAPSED");
-    const hasDefeatPoint = candidates.some((candidate) => candidate.kind === "PLAYER_DEFEATED");
+    const hasDefeatPoint = candidates.some((candidate) => (candidate.kind === "PLAYER_DEFEATED"
+        || (candidate.kind === "WORLD_COLLAPSED" && batches[candidate.batchIndex]?.facts.some((fact) => fact.type === "PLAYER_DEFEATED"))));
     if (summary.normalEndReasons.includes("WORLD_COLLAPSED") && !hasWorldCollapsePoint) {
         candidates.push({
             kind: "WORLD_COLLAPSED",
@@ -192,8 +193,9 @@ export function composeResultJudgment(summary, batches) {
         candidates.push({ kind: "MAX_ROUNDS_REACHED", batchIndex: batches.length, playerIds: [], amount: null, thresholds: [], rank: 4 });
     }
     const turningPoints = candidates
-        .sort((left, right) => left.batchIndex - right.batchIndex || left.rank - right.rank)
+        .sort((left, right) => left.rank - right.rank || left.batchIndex - right.batchIndex)
         .slice(0, 3)
+        .sort((left, right) => left.batchIndex - right.batchIndex || left.rank - right.rank)
         .map(({ rank: _rank, ...point }) => point);
     return {
         turningPoints,

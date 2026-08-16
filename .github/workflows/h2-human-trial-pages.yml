@@ -1,0 +1,86 @@
+name: H2 human trial Pages
+
+on:
+  workflow_dispatch:
+    inputs:
+      operation:
+        description: "publish: H2 trial / cleanup: remove the trial site"
+        required: true
+        default: publish
+        type: choice
+        options:
+          - publish
+          - cleanup
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: h2-human-trial-pages
+  cancel-in-progress: true
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    environment:
+      name: h2-human-trial
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Check out the selected main commit
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build H2 trial
+        if: inputs.operation == 'publish'
+        env:
+          TRIAL_PATH: p403-h2-${{ github.run_id }}
+          TRIAL_SOURCE_SHA: ${{ github.sha }}
+        run: npm run build:h2-trial
+
+      - name: Build cleanup site
+        if: inputs.operation == 'cleanup'
+        run: |
+          rm -rf dist
+          mkdir -p dist
+          touch dist/.nojekyll
+          printf '%s\n' 'User-agent: *' 'Disallow: /' > dist/robots.txt
+          printf '%s\n' '<!doctype html><html lang="ja"><head><meta name="robots" content="noindex,nofollow"><meta charset="utf-8"><title>Not found</title></head><body><p>試遊ページは公開されていません。</p></body></html>' > dist/404.html
+
+      - name: Configure GitHub Pages
+        uses: actions/configure-pages@v5
+
+      - name: Upload Pages artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: dist
+
+      - name: Deploy Pages
+        id: deployment
+        uses: actions/deploy-pages@v4
+
+      - name: Write trial URL
+        if: inputs.operation == 'publish'
+        env:
+          PAGE_URL: ${{ steps.deployment.outputs.page_url }}
+          TRIAL_PATH: p403-h2-${{ github.run_id }}
+        run: |
+          echo "## H2試遊URL" >> "$GITHUB_STEP_SUMMARY"
+          echo "${PAGE_URL}${TRIAL_PATH}/" >> "$GITHUB_STEP_SUMMARY"
+          echo "" >> "$GITHUB_STEP_SUMMARY"
+          echo "試遊後は同じworkflowを cleanup で実行してください。" >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Write cleanup result
+        if: inputs.operation == 'cleanup'
+        run: |
+          echo "## H2試遊ページを削除しました" >> "$GITHUB_STEP_SUMMARY"
+          echo "この実行のPagesは404だけを返します。" >> "$GITHUB_STEP_SUMMARY"

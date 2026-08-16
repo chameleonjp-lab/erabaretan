@@ -1,7 +1,7 @@
 # 選ばれたん：現行計画の参照順
 
 - 文書状態：現行
-- 更新日：2026-08-16
+- 更新日：2026-08-17
 - 適用対象：企画、ルール、実装、試遊、公開判断
 
 ## 1. この文書の目的
@@ -312,3 +312,12 @@ P0では次を揃える。
 - [game-core RNG / replay / state hash V1](25_GAME_CORE_RNG_REPLAY_HASH_V1.md)
 
 P1-03「thresholds / scoring」、P1-04「rng / replay / hash」、P1-04b「P0-06 golden manifest・実行境界・fixtureバイト列の訂正」、P1-05「projection / preview / summary」、P2-01「basic fixtures」、P2-02「adversarial fixtures」、P2-03「invariant / secrecy tests」、P3-01「battle shell」、P3-02「hand / action UX」、P3-03「world preview / judgment hint」、P3-04「result judgment / summary」、P4-01「CPU legal actions」の実装は完了した。旧ハッシュ値は履歴として隔離し、現行manifestを正本付属データとして扱う。実ブラウザ・iPhone縦画面の手動確認は公開前の停止条件として残し、P4-03 H2実験の自動門を通過した。正式v2化の前に、人間試遊とSol・Highの独立最終レビューを実施する。
+
+
+---
+
+## P4-03 H2人間試遊の実行準備
+
+H2は正式v2へ昇格せず、通常Webから分離した一時Pagesで人間試遊を行う。公開はworkflow_dispatchによる手動実行だけにし、試遊用URLは固定の入口へ載せず、実行結果へ表示する。iPhone Safariで8試合以上を行い、試遊版の記録欄から匿名の手作業記録を保存する。試遊後は同じworkflowをcleanupで実行し、Pagesを404だけの状態へ戻す。
+
+詳細は[H2人間試遊手順](35_ALPHA_12_H2_HUMAN_TRIAL.md)を参照する。

@@ -1,5 +1,7 @@
+import { calculateJudgment } from "../../packages/game-core/src/index.ts";
 import type { GamePhase, GameState, PlayerId } from "../../packages/game-core/src/state/types.ts";
 import type { PublicGameState } from "../../packages/game-core/src/public-state.ts";
+import type { PreviewDelta, PreviewResult } from "../../packages/game-core/src/preview.ts";
 
 export type ShellScreen = "TITLE" | "WORLD_LAW" | "BATTLE" | "RESULT";
 
@@ -98,6 +100,127 @@ export function requiresActionConfirmation(cardDefinitionId: string, mode: strin
   return mode === "RELEASE" && new Set([
     "attack.star-breaker.v1",
   ]).has(cardDefinitionId);
+}
+
+export type JudgmentHintLevel = "ADVANTAGE" | "EVEN" | "DISADVANTAGE";
+
+export interface JudgmentHint {
+  readonly playerId: PlayerId;
+  readonly level: JudgmentHintLevel;
+  readonly label: "選定優勢" | "拮抗" | "選定劣勢";
+}
+
+export interface PreviewJudgmentHint {
+  readonly before: JudgmentHint;
+  readonly after: JudgmentHint;
+  readonly uncertain: boolean;
+}
+
+export interface WorldPreview {
+  readonly before: number;
+  readonly after: number;
+  readonly crossedThresholds: readonly number[];
+  readonly uncertain: boolean;
+  readonly basis: "CONFIRMED" | "NO_RESPONSE";
+}
+
+const JUDGMENT_HINT_MARGIN = 5;
+
+function judgmentHintLabel(level: JudgmentHintLevel): JudgmentHint["label"] {
+  if (level === "ADVANTAGE") return "選定優勢";
+  if (level === "DISADVANTAGE") return "選定劣勢";
+  return "拮抗";
+}
+
+function judgmentHintLevel(scoreDifference: number): JudgmentHintLevel {
+  if (scoreDifference > JUDGMENT_HINT_MARGIN) return "ADVANTAGE";
+  if (scoreDifference < -JUDGMENT_HINT_MARGIN) return "DISADVANTAGE";
+  return "EVEN";
+}
+
+export function judgmentHint(state: GameState, playerId: PlayerId): JudgmentHint {
+  const opponentId = state.initialPlayerOrder.find((candidate) => candidate !== playerId);
+  const scores = calculateJudgment(state).playerScores;
+  const scoreDifference = opponentId
+    ? (scores[playerId] ?? 0) - (scores[opponentId] ?? 0)
+    : 0;
+  const level = judgmentHintLevel(scoreDifference);
+  return { playerId, level, label: judgmentHintLabel(level) };
+}
+
+function clamp(value: number, minimum: number, maximum: number): number {
+  return Math.max(minimum, Math.min(maximum, value));
+}
+
+function deltaForJudgment(result: Extract<PreviewResult, { readonly status: "READY" }>): { delta: PreviewDelta; basis: WorldPreview["basis"] } {
+  return result.pendingAttackNoResponseDelta
+    ? { delta: result.pendingAttackNoResponseDelta, basis: "NO_RESPONSE" }
+    : { delta: result.delta, basis: "CONFIRMED" };
+}
+
+function stateAfterPreviewDelta(state: GameState, delta: PreviewDelta): GameState {
+  const players = Object.fromEntries(state.initialPlayerOrder.map((playerId) => {
+    const player = state.players[playerId];
+    return [playerId, {
+      ...player,
+      hitPoints: clamp(player.hitPoints + (delta.playerHitPointDeltas[playerId] ?? 0), 0, player.maxHitPoints),
+      survivedRoundCount: player.survivedRoundCount
+        + (delta.playerSurvivedRoundCountDeltas[playerId] ?? 0),
+      worldDamageResponsibility: player.worldDamageResponsibility
+        + (delta.playerWorldDamageResponsibilityDeltas[playerId] ?? 0),
+      effectiveWorldRestore: player.effectiveWorldRestore
+        + (delta.playerEffectiveWorldRestoreDeltas[playerId] ?? 0),
+    }];
+  }));
+  return {
+    ...state,
+    players: players as GameState["players"],
+    world: {
+      ...state.world,
+      durability: clamp(
+        state.world.durability + delta.worldDurabilityDelta,
+        0,
+        state.world.maxDurability,
+      ),
+      collapseResponsiblePlayerId: delta.worldCollapseResponsiblePlayerId,
+    },
+    terminalFlags: {
+      ...state.terminalFlags,
+      worldCollapsed: delta.worldCollapsed,
+    },
+  };
+}
+
+export function worldPreview(state: GameState, result: PreviewResult): WorldPreview | null {
+  if (result.status !== "READY") return null;
+  const selected = deltaForJudgment(result);
+  return {
+    before: state.world.durability,
+    after: clamp(
+      state.world.durability + selected.delta.worldDurabilityDelta,
+      0,
+      state.world.maxDurability,
+    ),
+    crossedThresholds: selected.delta.crossedWorldThresholds,
+    uncertain: result.uncertainties.includes("OPPONENT_RESPONSE"),
+    basis: selected.basis,
+  };
+}
+
+export function previewJudgmentHint(
+  state: GameState,
+  playerId: PlayerId,
+  result: PreviewResult,
+): PreviewJudgmentHint | null {
+  if (result.status !== "READY") return null;
+  const selected = deltaForJudgment(result);
+  const before = judgmentHint(state, playerId);
+  const after = judgmentHint(stateAfterPreviewDelta(state, selected.delta), playerId);
+  return {
+    before,
+    after,
+    uncertain: result.uncertainties.includes("OPPONENT_RESPONSE"),
+  };
 }
 
 export function battlePrompt(state: PublicGameState, viewerPlayerId: PlayerId): string {

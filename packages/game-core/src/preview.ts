@@ -78,7 +78,12 @@ export type PreviewUncertainty = "OPPONENT_RESPONSE" | "HIDDEN_DRAW_IDENTITY";
 export interface PreviewDelta {
   readonly playerHitPointDeltas: Readonly<Record<PlayerId, number>>;
   readonly handCountDeltas: Readonly<Record<PlayerId, number>>;
+  readonly playerSurvivedRoundCountDeltas: Readonly<Record<PlayerId, number>>;
+  readonly playerWorldDamageResponsibilityDeltas: Readonly<Record<PlayerId, number>>;
+  readonly playerEffectiveWorldRestoreDeltas: Readonly<Record<PlayerId, number>>;
   readonly worldDurabilityDelta: number;
+  readonly worldCollapsed: boolean;
+  readonly worldCollapseResponsiblePlayerId: PlayerId | null;
   readonly crossedWorldThresholds: readonly number[];
   readonly phaseAfter: GameState["phase"];
   readonly wouldFinishMatch: boolean;
@@ -106,6 +111,8 @@ export type PreviewResult =
       readonly delta: PreviewDelta;
       readonly uncertainties: readonly PreviewUncertainty[];
       readonly pendingAttackBaseDamage?: number;
+      /** Public result if the pending attack is accepted without a response. */
+      readonly pendingAttackNoResponseDelta?: PreviewDelta;
     }
   | {
       readonly status: "REJECTED";
@@ -119,6 +126,7 @@ export type PreviewResult =
     };
 
 export type PreviewExecutor = (state: GameState, command: Command) => ReplayCommandExecution;
+export type PendingAttackPreviewExecutor = (state: GameState) => ReplayCommandExecution;
 
 const COMMAND_TYPES: readonly CommandType[] = [
   "PLAY_CARD",
@@ -263,12 +271,18 @@ function cloneState(state: GameState): GameState {
 function createDelta(before: GameState, after: GameState): PreviewDelta {
   const playerHitPointDeltas: Record<PlayerId, number> = {};
   const handCountDeltas: Record<PlayerId, number> = {};
+  const playerSurvivedRoundCountDeltas: Record<PlayerId, number> = {};
+  const playerWorldDamageResponsibilityDeltas: Record<PlayerId, number> = {};
+  const playerEffectiveWorldRestoreDeltas: Record<PlayerId, number> = {};
   for (const playerId of before.initialPlayerOrder) {
     const beforePlayer = before.players[playerId];
     const afterPlayer = after.players[playerId];
     if (!beforePlayer || !afterPlayer) throw new Error(`missing player in preview result: ${playerId}`);
     playerHitPointDeltas[playerId] = afterPlayer.hitPoints - beforePlayer.hitPoints;
     handCountDeltas[playerId] = after.cardZones.hands[playerId].length - before.cardZones.hands[playerId].length;
+    playerSurvivedRoundCountDeltas[playerId] = afterPlayer.survivedRoundCount - beforePlayer.survivedRoundCount;
+    playerWorldDamageResponsibilityDeltas[playerId] = afterPlayer.worldDamageResponsibility - beforePlayer.worldDamageResponsibility;
+    playerEffectiveWorldRestoreDeltas[playerId] = afterPlayer.effectiveWorldRestore - beforePlayer.effectiveWorldRestore;
   }
   const crossedWorldThresholds = after.world.triggeredThresholds.filter(
     (threshold) => !before.world.triggeredThresholds.includes(threshold),
@@ -276,7 +290,12 @@ function createDelta(before: GameState, after: GameState): PreviewDelta {
   return {
     playerHitPointDeltas,
     handCountDeltas,
+    playerSurvivedRoundCountDeltas,
+    playerWorldDamageResponsibilityDeltas,
+    playerEffectiveWorldRestoreDeltas,
     worldDurabilityDelta: after.world.durability - before.world.durability,
+    worldCollapsed: after.terminalFlags.worldCollapsed,
+    worldCollapseResponsiblePlayerId: after.world.collapseResponsiblePlayerId,
     crossedWorldThresholds,
     phaseAfter: after.phase,
     wouldFinishMatch: after.phase === "FINISHED",
@@ -297,6 +316,7 @@ export function previewCommand(
   viewer: StateViewer,
   intent: unknown,
   executor: PreviewExecutor,
+  pendingAttackExecutor?: PendingAttackPreviewExecutor,
 ): PreviewResult {
   const basedOnRevision = typeof state?.revision === "number" ? state.revision : -1;
   if (viewer?.kind !== "PLAYER") return rejection(basedOnRevision, "VIEWER_NOT_PLAYER");
@@ -361,9 +381,22 @@ export function previewCommand(
       uncertainties,
     };
     if (isWaitingForOpponentResponse && execution.state.pendingAttack) {
+      let pendingAttackNoResponseDelta: PreviewDelta | undefined;
+      if (pendingAttackExecutor) {
+        try {
+          const noResponse = pendingAttackExecutor(execution.state);
+          if (noResponse.accepted && !noResponse.replayed && noResponse.state) {
+            assertGameState(noResponse.state);
+            pendingAttackNoResponseDelta = createDelta(state, noResponse.state);
+          }
+        } catch {
+          pendingAttackNoResponseDelta = undefined;
+        }
+      }
       return {
         ...result,
         pendingAttackBaseDamage: execution.state.pendingAttack.baseDamage,
+        ...(pendingAttackNoResponseDelta ? { pendingAttackNoResponseDelta } : {}),
       };
     }
     return result;

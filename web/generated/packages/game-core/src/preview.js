@@ -132,6 +132,9 @@ function cloneState(state) {
 function createDelta(before, after) {
     const playerHitPointDeltas = {};
     const handCountDeltas = {};
+    const playerSurvivedRoundCountDeltas = {};
+    const playerWorldDamageResponsibilityDeltas = {};
+    const playerEffectiveWorldRestoreDeltas = {};
     for (const playerId of before.initialPlayerOrder) {
         const beforePlayer = before.players[playerId];
         const afterPlayer = after.players[playerId];
@@ -139,12 +142,20 @@ function createDelta(before, after) {
             throw new Error(`missing player in preview result: ${playerId}`);
         playerHitPointDeltas[playerId] = afterPlayer.hitPoints - beforePlayer.hitPoints;
         handCountDeltas[playerId] = after.cardZones.hands[playerId].length - before.cardZones.hands[playerId].length;
+        playerSurvivedRoundCountDeltas[playerId] = afterPlayer.survivedRoundCount - beforePlayer.survivedRoundCount;
+        playerWorldDamageResponsibilityDeltas[playerId] = afterPlayer.worldDamageResponsibility - beforePlayer.worldDamageResponsibility;
+        playerEffectiveWorldRestoreDeltas[playerId] = afterPlayer.effectiveWorldRestore - beforePlayer.effectiveWorldRestore;
     }
     const crossedWorldThresholds = after.world.triggeredThresholds.filter((threshold) => !before.world.triggeredThresholds.includes(threshold));
     return {
         playerHitPointDeltas,
         handCountDeltas,
+        playerSurvivedRoundCountDeltas,
+        playerWorldDamageResponsibilityDeltas,
+        playerEffectiveWorldRestoreDeltas,
         worldDurabilityDelta: after.world.durability - before.world.durability,
+        worldCollapsed: after.terminalFlags.worldCollapsed,
+        worldCollapseResponsiblePlayerId: after.world.collapseResponsiblePlayerId,
         crossedWorldThresholds,
         phaseAfter: after.phase,
         wouldFinishMatch: after.phase === "FINISHED",
@@ -158,7 +169,7 @@ function hasHiddenDraw(before, after, events) {
  * Executes a preview through the production command executor and exposes only
  * public deltas. The executor receives a generated envelope, never caller data.
  */
-export function previewCommand(state, viewer, intent, executor) {
+export function previewCommand(state, viewer, intent, executor, pendingAttackExecutor) {
     const basedOnRevision = typeof state?.revision === "number" ? state.revision : -1;
     if (viewer?.kind !== "PLAYER")
         return rejection(basedOnRevision, "VIEWER_NOT_PLAYER");
@@ -229,9 +240,23 @@ export function previewCommand(state, viewer, intent, executor) {
             uncertainties,
         };
         if (isWaitingForOpponentResponse && execution.state.pendingAttack) {
+            let pendingAttackNoResponseDelta;
+            if (pendingAttackExecutor) {
+                try {
+                    const noResponse = pendingAttackExecutor(execution.state);
+                    if (noResponse.accepted && !noResponse.replayed && noResponse.state) {
+                        assertGameState(noResponse.state);
+                        pendingAttackNoResponseDelta = createDelta(state, noResponse.state);
+                    }
+                }
+                catch {
+                    pendingAttackNoResponseDelta = undefined;
+                }
+            }
             return {
                 ...result,
                 pendingAttackBaseDamage: execution.state.pendingAttack.baseDamage,
+                ...(pendingAttackNoResponseDelta ? { pendingAttackNoResponseDelta } : {}),
             };
         }
         return result;

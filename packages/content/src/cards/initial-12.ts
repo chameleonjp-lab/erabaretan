@@ -49,12 +49,16 @@ const responseCondition: InitialCardCondition = {
   requiresPendingAttackDefender: true,
 };
 
-const damagePlayer = (amount: number, target: "SELF" | "OPPONENT"): CardEffectTemplate => ({
+const damagePlayer = (
+  amount: number,
+  target: "SELF" | "OPPONENT",
+  executionTiming: EffectCommand["executionTiming"] = "AFTER_RESPONSE_MODIFIERS",
+): CardEffectTemplate => ({
   commandType: "DAMAGE_PLAYER",
   target,
   payload: { amount, damageKind: "DIRECT" },
   attributionPolicy: "NO_LEDGER",
-  executionTiming: "AFTER_RESPONSE_MODIFIERS",
+  executionTiming,
 });
 
 const damageWorld = (amount: number): CardEffectTemplate => ({
@@ -165,7 +169,10 @@ export const INITIAL_12_CARD_DEFINITIONS: readonly InitialCardDefinition[] = [
     role: "INTERVENTION",
     worldImpactType: "NEUTRAL",
     copiesInDeck: 3,
-    modes: { RELEASE: [damagePlayer(8, "OPPONENT")], RESTRAIN: [damagePlayer(3, "OPPONENT")] },
+    modes: {
+      RELEASE: [damagePlayer(8, "OPPONENT", "IMMEDIATE")],
+      RESTRAIN: [damagePlayer(3, "OPPONENT", "IMMEDIATE")],
+    },
     conditions: { RELEASE: { ...actionTargetCondition, opponentWorldDamageResponsibilityAtLeast: 5 }, RESTRAIN: actionTargetCondition },
   },
   {

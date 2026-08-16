@@ -3,3 +3,4 @@ export { ALPHA_12_CATALOG_HASH, ALPHA_12_ENGINE_VERSION, buildInitial12Deck, cre
 export { executeAlpha12Command } from "./setup/alpha-12-command-executor.js";
 export { previewAlpha12Command } from "./setup/alpha-12-preview.js";
 export { alpha12CpuCommandId, enumerateAlpha12CpuActions, generateAlpha12CpuLegalCommands, materializeAlpha12CpuCommand, } from "./cpu/legal-actions.js";
+export { ALPHA_12_CPU_POLICY_ID, ALPHA_12_SIMULATION_VERSION, DEFAULT_MAX_SIMULATION_STEPS, runAlpha12Simulation, } from "./simulation/alpha-12-simulation.js";

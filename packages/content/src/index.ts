@@ -39,3 +39,22 @@ export {
 } from "./cpu/legal-actions.ts";
 
 export type { CpuActionIntent } from "./cpu/legal-actions.ts";
+
+export {
+  ALPHA_12_CPU_POLICY_ID,
+  ALPHA_12_SIMULATION_VERSION,
+  DEFAULT_MAX_SIMULATION_STEPS,
+  runAlpha12Simulation,
+} from "./simulation/alpha-12-simulation.ts";
+
+export type {
+  Alpha12CardUsage,
+  Alpha12SimulationMatchRecord,
+  Alpha12SimulationMetrics,
+  Alpha12SimulationOptions,
+  Alpha12SimulationResult,
+  Alpha12ThresholdRounds,
+  SimulationRate,
+  SimulationEndKind,
+  SimulationThreshold,
+} from "./simulation/alpha-12-simulation.ts";

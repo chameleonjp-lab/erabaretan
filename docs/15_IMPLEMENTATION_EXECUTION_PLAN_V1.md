@@ -461,6 +461,14 @@ CPUは本人が見られる情報だけを使う。
 
 P4-01では、本人向け`PublicGameState`だけを入力にして、`ACTION_SELECTION`、`RESPONSE_SELECTION`、手札超過中の`TURN_START`から合法な候補を決定的に列挙する。`SURRENDER`は合法なプレイヤーcommandとして候補へ含め、`TIMEOUT_DEFAULT_ACTION`は期限管理側のシステム操作として除外する。commandId・revisionの付与は列挙と分離し、P4-02の評価関数、試合ループ、seed反復、統計収集は含めない。
 
+### 7.1.2 P4-02 シミュレーション指標
+
+P4-02では、固定seedを使ったCPU対CPUの決定的な反復試験を追加する。CPU方針IDは`public-greedy-v1`とし、本人向け`PublicGameState`、合法候補、公開カード定義だけを参照する。秘密手札、山札順、seed、未使用乱数、command履歴、効果キューは方針へ渡さない。
+
+試合ループは`TURN_START`の補充・手札超過、`ACTION_SELECTION`、`RESPONSE_SELECTION`を既存のproduction executorへ渡し、未受理command、無限ループ、終端summary不整合を測定値にせずエラーにする。各試合でseed、rulesetId、CPU方針ID、終了種別、最終状態ハッシュ、終端ラウンド、75・50・25到達ラウンド、世界崩壊、最大ラウンド、解放・抑制、カード使用、先攻選定、戦闘勝者と選定者の一致、誓約の使用・使用後生存、`DISCARD_FOR_ACTION`を記録し、0除算の率は`null`とする。
+
+P4-02ではカード性能、ruleset検証値、世界律、採点係数を変更しない。偏りの評価と数値調整はP4-03へ分離する。
+
 ## 7.2 自動対戦で記録するもの
 
 - seed
@@ -872,3 +880,9 @@ P3-04専用の公開事実境界、最大3件、同一バッチ重複排除、�
 ## 23. P4-01「CPU legal actions」完了記録
 
 P4-01では、`PublicGameState`を入口にしたCPU合法手列挙、`materializeAlpha12CpuCommand`によるcommand化、公開状態用カード条件validator、`careful-redraw`の全捨て札候補、応答、`DISCARD_OVERFLOW`、`SURRENDER`を追加した。秘密の相手手札、山札順、seed、未使用乱数、command履歴は列挙へ渡さない。`tests/content/p4-01-cpu-legal-actions.test.mjs`で候補のvalidator受理・production executor受理・決定性・秘密情報差分を固定した。型検査、静的Webビルド、全115件の試験が成功し、Sol・Highの設計レビューはAPPROVEとなった。実ブラウザ・iPhone実機の手動確認は未実施である。次はP4-02「simulation metrics」へ進む。
+
+## 24. P4-02「simulation metrics」完了記録
+
+P4-02では、`runAlpha12Simulation`による固定seed反復、公開情報だけで選ぶ`public-greedy-v1`方針、`TURN_START`・応答・手札超過を含む既存executorの試合ループ、終端summary検証を追加した。試合ごとにseed、rulesetId、方針ID、終了種別、最終状態ハッシュ、終端ラウンド、完了ラウンド、75・50・25到達ラウンド、世界崩壊・最大ラウンド、解放・抑制、カード使用、先攻選定、戦闘・選定一致、誓約、`DISCARD_FOR_ACTION`を記録する。分母0の率は`null`とし、誓約生存は`(matchId, playerId)`単位で終端HPを判定する。
+
+`tests/content/p4-02-simulation-metrics.test.mjs`を追加し、同一seed・matchId・方針の完全一致、最終ハッシュ形式、指標分母、0件率、閾値到達順を固定した。通常の直接ダメージを応答待ちとして解決しようとする既存カードテンプレートも同時に検出し、応答を生成しない`judgment-of-scars`の実行時点を`IMMEDIATE`へ訂正した。カード性能・ruleset値・採点は変更していない。全119件の試験、型検査、静的Webビルドが成功した。実ブラウザ・iPhone実機の手動確認は未実施である。次はP4-03「balance pass」へ進む。

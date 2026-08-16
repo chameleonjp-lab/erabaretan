@@ -7,7 +7,12 @@ import {
   SHUFFLE_ALGORITHM_VERSION,
   shuffleFisherYatesDesc,
 } from "../../../game-core/src/rng/xoshiro128ss.ts";
-import { INITIAL_12_CARD_DEFINITIONS, type InitialCardDefinition } from "../cards/initial-12.ts";
+import {
+  INITIAL_12_CARD_DEFINITIONS,
+  INITIAL_12_CATALOG,
+  type Initial12Catalog,
+  type InitialCardDefinition,
+} from "../cards/initial-12.ts";
 
 export const ALPHA_12_CATALOG_HASH = "catalog.alpha-12.v1" as const;
 export const ALPHA_12_ENGINE_VERSION = "game-core.alpha-12.v1" as const;
@@ -19,6 +24,7 @@ export interface Alpha12SetupInput {
   readonly catalogHash?: string;
   readonly engineVersion?: string;
   readonly ruleset?: RulesetSnapshot;
+  readonly catalog?: Initial12Catalog;
 }
 
 export interface Alpha12SetupResult {
@@ -80,7 +86,8 @@ function cardInstancesForSetup(
 export function createAlpha12Setup(input: Alpha12SetupInput): Alpha12SetupResult {
   const playerIds = input.playerIds ?? ["P1", "P2"];
   const ruleset = input.ruleset ?? ALPHA_12_RULESET;
-  const sortedDeck = buildInitial12Deck();
+  const catalog = input.catalog ?? INITIAL_12_CATALOG;
+  const sortedDeck = buildInitial12Deck(catalog.definitions);
   const rng = createDeterministicRng(input.seed);
   const shuffledDeck = shuffleFisherYatesDesc(sortedDeck, rng);
   const hands: Record<PlayerId, CardInstanceId[]> = { [playerIds[0]]: [], [playerIds[1]]: [] };

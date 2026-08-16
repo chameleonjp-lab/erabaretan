@@ -1,7 +1,10 @@
 export {
+  INITIAL_12_CATALOG,
   INITIAL_12_CARD_BY_ID,
   INITIAL_12_CARD_DEFINITIONS,
   buildInitial12CardEffects,
+  createInitial12Catalog,
+  createInitial12CommandValidationOptions,
   initial12CommandValidationOptions,
   validateInitial12CardPlay,
   validateInitial12CardPlayFromPublicState,
@@ -9,6 +12,7 @@ export {
 
 export type {
   BuildCardEffectsInput,
+  Initial12Catalog,
   Initial12CardConditionCode,
   Initial12CardConditionResult,
   InitialCardCondition,
@@ -42,9 +46,11 @@ export type { CpuActionIntent } from "./cpu/legal-actions.ts";
 
 export {
   ALPHA_12_CPU_POLICY_ID,
+  ALPHA_12_V1_PROFILE,
   ALPHA_12_SIMULATION_VERSION,
   DEFAULT_MAX_SIMULATION_STEPS,
   runAlpha12Simulation,
+  runAlpha12SimulationWithProfile,
 } from "./simulation/alpha-12-simulation.ts";
 
 export type {
@@ -52,6 +58,7 @@ export type {
   Alpha12SimulationMatchRecord,
   Alpha12SimulationMetrics,
   Alpha12SimulationOptions,
+  Alpha12SimulationProfile,
   Alpha12SimulationResult,
   Alpha12ThresholdRounds,
   SimulationRate,

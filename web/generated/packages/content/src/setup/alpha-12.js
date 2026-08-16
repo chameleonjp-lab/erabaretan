@@ -1,7 +1,7 @@
 import { createInitialGameState } from "../../../game-core/src/state/create-initial-state.js";
 import { ALPHA_12_RULESET } from "../../../game-core/src/state/rules.js";
 import { createDeterministicRng, RNG_ALGORITHM_VERSION, SHUFFLE_ALGORITHM_VERSION, shuffleFisherYatesDesc, } from "../../../game-core/src/rng/xoshiro128ss.js";
-import { INITIAL_12_CARD_DEFINITIONS } from "../cards/initial-12.js";
+import { INITIAL_12_CARD_DEFINITIONS, INITIAL_12_CATALOG, } from "../cards/initial-12.js";
 export const ALPHA_12_CATALOG_HASH = "catalog.alpha-12.v1";
 export const ALPHA_12_ENGINE_VERSION = "game-core.alpha-12.v1";
 function compareUtf8(left, right) {
@@ -41,7 +41,8 @@ function cardInstancesForSetup(sortedDeck, hands, playerIds) {
 export function createAlpha12Setup(input) {
     const playerIds = input.playerIds ?? ["P1", "P2"];
     const ruleset = input.ruleset ?? ALPHA_12_RULESET;
-    const sortedDeck = buildInitial12Deck();
+    const catalog = input.catalog ?? INITIAL_12_CATALOG;
+    const sortedDeck = buildInitial12Deck(catalog.definitions);
     const rng = createDeterministicRng(input.seed);
     const shuffledDeck = shuffleFisherYatesDesc(sortedDeck, rng);
     const hands = { [playerIds[0]]: [], [playerIds[1]]: [] };

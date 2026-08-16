@@ -6,8 +6,9 @@ import type {
 import { projectPublicState, type PublicCardRef, type PublicGameState } from "../../../game-core/src/public-state.ts";
 import type { GameState, PlayMode, PlayerId } from "../../../game-core/src/state/types.ts";
 import {
-  INITIAL_12_CARD_BY_ID,
+  INITIAL_12_CATALOG,
   validateInitial12CardPlayFromPublicState,
+  type Initial12Catalog,
 } from "../cards/initial-12.ts";
 
 /**
@@ -52,8 +53,9 @@ function pushPlayCardActions(
   card: PublicCardRef,
   opponentIds: readonly PlayerId[],
   actions: CpuActionIntent[],
+  catalog: Initial12Catalog,
 ): void {
-  const definition = INITIAL_12_CARD_BY_ID[card.cardDefinitionId];
+  const definition = catalog.byId[card.cardDefinitionId];
   if (!definition) return;
 
   const modes = Object.keys(definition.modes)
@@ -74,7 +76,7 @@ function pushPlayCardActions(
           mode,
           targetPlayerId,
           discardCardInstanceId,
-        });
+        }, catalog);
         if (!validation.ok) continue;
         actions.push({
           commandType: "PLAY_CARD",
@@ -132,14 +134,18 @@ function compareActions(left: CpuActionIntent, right: CpuActionIntent): number {
  * command history. Surrender is a legal player command; timeout fallback is a
  * server/system operation and is not a CPU choice.
  */
-export function enumerateAlpha12CpuActions(view: PublicGameState, playerId: PlayerId): readonly CpuActionIntent[] {
+export function enumerateAlpha12CpuActions(
+  view: PublicGameState,
+  playerId: PlayerId,
+  catalog: Initial12Catalog = INITIAL_12_CATALOG,
+): readonly CpuActionIntent[] {
   const hand = ownHand(view, playerId);
   if (!hand) return [];
 
   const actions: CpuActionIntent[] = [];
   const opponentIds = opponents(view, playerId);
   if (view.phase === "ACTION_SELECTION" && view.activePlayerId === playerId) {
-    for (const card of hand) pushPlayCardActions(view, playerId, card, opponentIds, actions);
+    for (const card of hand) pushPlayCardActions(view, playerId, card, opponentIds, actions, catalog);
     for (const card of hand) {
       actions.push({
         commandType: "DISCARD_FOR_ACTION",
@@ -151,14 +157,14 @@ export function enumerateAlpha12CpuActions(view: PublicGameState, playerId: Play
 
   if (view.phase === "RESPONSE_SELECTION" && view.respondingPlayerId === playerId) {
     for (const card of hand) {
-      const definition = INITIAL_12_CARD_BY_ID[card.cardDefinitionId];
+      const definition = catalog.byId[card.cardDefinitionId];
       if (!definition?.modes.RESPONSE) continue;
       const validation = validateInitial12CardPlayFromPublicState({
         state: view,
         playerId,
         card,
         mode: "RESPONSE",
-      });
+      }, catalog);
       if (validation.ok) {
         actions.push({
           commandType: "SELECT_RESPONSE",
@@ -218,10 +224,14 @@ export function alpha12CpuCommandId(playerId: PlayerId, revision: number, ordina
 }
 
 /** Convenience adapter for a local authoritative state; enumeration itself remains public-view only. */
-export function generateAlpha12CpuLegalCommands(state: GameState, playerId: PlayerId): readonly Command[] {
+export function generateAlpha12CpuLegalCommands(
+  state: GameState,
+  playerId: PlayerId,
+  catalog: Initial12Catalog = INITIAL_12_CATALOG,
+): readonly Command[] {
   const projected = projectPublicState(state, { kind: "PLAYER", playerId });
   if (!projected.ok) return [];
-  return enumerateAlpha12CpuActions(projected.state, playerId).map((action, index) => (
+  return enumerateAlpha12CpuActions(projected.state, playerId, catalog).map((action, index) => (
     materializeAlpha12CpuCommand(
       action,
       projected.state.revision,

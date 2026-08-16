@@ -221,9 +221,22 @@ export const INITIAL_12_CARD_DEFINITIONS: readonly InitialCardDefinition[] = [
   },
 ];
 
-export const INITIAL_12_CARD_BY_ID: Readonly<Record<CardDefinitionId, InitialCardDefinition>> = Object.fromEntries(
-  INITIAL_12_CARD_DEFINITIONS.map((definition) => [definition.cardDefinitionId, definition]),
-);
+export interface Initial12Catalog {
+  readonly definitions: readonly InitialCardDefinition[];
+  readonly byId: Readonly<Record<CardDefinitionId, InitialCardDefinition>>;
+}
+
+export function createInitial12Catalog(definitions: readonly InitialCardDefinition[]): Initial12Catalog {
+  return {
+    definitions,
+    byId: Object.fromEntries(
+      definitions.map((definition) => [definition.cardDefinitionId, definition]),
+    ) as Readonly<Record<CardDefinitionId, InitialCardDefinition>>,
+  };
+}
+
+export const INITIAL_12_CATALOG = createInitial12Catalog(INITIAL_12_CARD_DEFINITIONS);
+export const INITIAL_12_CARD_BY_ID = INITIAL_12_CATALOG.byId;
 
 export interface BuildCardEffectsInput {
   readonly resolutionId: string;
@@ -250,8 +263,11 @@ function resolveTarget(target: TemplateTarget, input: BuildCardEffectsInput) {
   return { targetKind: "CURRENT_PENDING_ATTACK" as const, pendingAttackId: input.pendingAttackId };
 }
 
-export function buildInitial12CardEffects(input: BuildCardEffectsInput): readonly EffectCommand[] {
-  const definition = INITIAL_12_CARD_BY_ID[input.cardDefinitionId];
+export function buildInitial12CardEffects(
+  input: BuildCardEffectsInput,
+  catalog: Initial12Catalog = INITIAL_12_CATALOG,
+): readonly EffectCommand[] {
+  const definition = catalog.byId[input.cardDefinitionId];
   if (!definition) throw new Error(`Unknown initial card definition: ${input.cardDefinitionId}`);
   const templates = definition.modes[input.mode];
   if (!templates) throw new Error(`${input.cardDefinitionId} does not support mode ${input.mode}`);
@@ -482,13 +498,16 @@ function validateInitial12CardConditions(input: {
  * knowledge into game-core. The command layer can call this after the generic
  * command shape/ownership checks have passed.
  */
-export function validateInitial12CardPlay(input: ValidateInitial12CardPlayInput): Initial12CardConditionResult {
+export function validateInitial12CardPlay(
+  input: ValidateInitial12CardPlayInput,
+  catalog: Initial12Catalog = INITIAL_12_CATALOG,
+): Initial12CardConditionResult {
   const card = input.state.cardInstances[input.cardInstanceId];
   if (!card) return { ok: false, code: "INVALID_CARD", message: "card instance does not exist" };
   if (card.ownerPlayerId !== input.playerId || !input.state.cardZones.hands[input.playerId]?.includes(input.cardInstanceId)) {
     return { ok: false, code: "CARD_NOT_IN_HAND", message: "card instance is not in the player's hand" };
   }
-  const definition = INITIAL_12_CARD_BY_ID[card.cardDefinitionId];
+  const definition = catalog.byId[card.cardDefinitionId];
   if (!definition) return { ok: false, code: "INVALID_CARD", message: "card definition is not in the alpha-12 catalog" };
   return validateInitial12CardConditions({
     context: gameStateConditionContext(input.state),
@@ -502,7 +521,10 @@ export function validateInitial12CardPlay(input: ValidateInitial12CardPlayInput)
 }
 
 /** Validates the same catalog condition contract against a player-scoped view. */
-export function validateInitial12CardPlayFromPublicState(input: ValidateInitial12CardPublicPlayInput): Initial12CardConditionResult {
+export function validateInitial12CardPlayFromPublicState(
+  input: ValidateInitial12CardPublicPlayInput,
+  catalog: Initial12Catalog = INITIAL_12_CATALOG,
+): Initial12CardConditionResult {
   const ownPlayer = input.state.players.find((player) => player.playerId === input.playerId);
   const publicCard = ownPlayer?.hand.cards?.find((card) => card.cardInstanceId === input.card.cardInstanceId);
   if (!publicCard) {
@@ -511,7 +533,7 @@ export function validateInitial12CardPlayFromPublicState(input: ValidateInitial1
   if (publicCard.cardDefinitionId !== input.card.cardDefinitionId) {
     return { ok: false, code: "INVALID_CARD", message: "public card definition does not match the player's hand" };
   }
-  const definition = INITIAL_12_CARD_BY_ID[publicCard.cardDefinitionId];
+  const definition = catalog.byId[publicCard.cardDefinitionId];
   if (!definition) return { ok: false, code: "INVALID_CARD", message: "card definition is not in the alpha-12 catalog" };
   return validateInitial12CardConditions({
     context: publicStateConditionContext(input.state),
@@ -524,14 +546,20 @@ export function validateInitial12CardPlayFromPublicState(input: ValidateInitial1
   });
 }
 
-export const initial12CommandValidationOptions: CommandValidationOptions = {
-  cardConditionValidator: (input) => {
-    const validation = validateInitial12CardPlay(input);
-    if (validation.ok === true) return { ok: true };
-    return {
-      ok: false,
-      code: validation.code === "INVALID_TARGET" ? "INVALID_TARGET" : "CARD_CONDITION_NOT_MET",
-      message: validation.message,
-    };
-  },
-};
+export function createInitial12CommandValidationOptions(
+  catalog: Initial12Catalog = INITIAL_12_CATALOG,
+): CommandValidationOptions {
+  return {
+    cardConditionValidator: (input) => {
+      const validation = validateInitial12CardPlay(input, catalog);
+      if (validation.ok === true) return { ok: true };
+      return {
+        ok: false,
+        code: validation.code === "INVALID_TARGET" ? "INVALID_TARGET" : "CARD_CONDITION_NOT_MET",
+        message: validation.message,
+      };
+    },
+  };
+}
+
+export const initial12CommandValidationOptions = createInitial12CommandValidationOptions();

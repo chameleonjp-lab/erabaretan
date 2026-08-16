@@ -429,7 +429,7 @@ function renderTrialRecord(summary: MatchSummary): string {
     "75境界の直前で、試合が長く停滞しませんでしたか？",
     "神の選定者を、結果が出る前にある程度予想できましたか？",
   ];
-  return `<section class="trial-record"><span class="eyebrow">人間試遊の記録</span><h2>試合 ${shell.rematchNumber} の記録</h2><p class="trial-record-meta">候補：${escapeHtml(H2_TRIAL_CANDIDATE_ID)} / seed：<code>${escapeHtml(trialSeedForMatch(shell.rematchNumber))}</code> / 先攻：${escapeHtml(playerLabel(state.firstPlayerId))} / 終了：${escapeHtml(summary.endKind)} / ラウンド：${state.roundNumber} / 75境界：${state.world.triggeredThresholds.includes(75) ? "到達" : "未到達"}</p><div class="trial-questions">${questions.map((question, index) => `<label><span>${index + 1}. ${escapeHtml(question)}</span><textarea data-trial-answer="${index}" rows="2" placeholder="短く記録"></textarea></label>`).join("")}</div><button class="secondary-button wide" data-copy-trial-record>この試合の記録をコピー</button><p class="small-note">記録はこの画面内だけに置かれ、どこにも送信されません。</p></section>`;
+  return `<section class="trial-record"><span class="eyebrow">人間試遊の記録</span><h2>試合 ${shell.rematchNumber} の記録</h2><p class="trial-record-meta">候補：${escapeHtml(H2_TRIAL_CANDIDATE_ID)} / seed：<code>${escapeHtml(trialSeedForMatch(shell.rematchNumber))}</code> / 先攻：${escapeHtml(playerLabel(state.firstPlayerId))} / 終了：${escapeHtml(summary.endKind)} / ラウンド：${state.roundNumber} / 75境界：${state.world.triggeredThresholds.includes(75) ? "到達" : "未到達"}</p><div class="trial-questions">${questions.map((question, index) => `<label><span>${index + 1}. ${escapeHtml(question)}</span><textarea data-trial-answer="${index}" rows="2" placeholder="短く記録"></textarea></label>`).join("")}</div><button class="secondary-button wide" data-copy-trial-record>この試合の記録をコピー</button><p class="trial-record-notice" data-trial-record-notice role="status"></p><p class="small-note">記録はこの画面内だけに置かれ、どこにも送信されません。</p></section>`;
 }
 
 async function copyTrialRecord(): Promise<void> {
@@ -437,6 +437,11 @@ async function copyTrialRecord(): Promise<void> {
   const result = summarizeMatch(shell.state);
   if (!result.ok) return;
   const answers = Array.from(app.querySelectorAll<HTMLTextAreaElement>("[data-trial-answer]")).map((input) => input.value.trim());
+  const notice = app.querySelector<HTMLElement>("[data-trial-record-notice]");
+  if (answers.some((answer) => answer.length === 0)) {
+    if (notice) notice.textContent = "5問すべてに回答してからコピーしてください。";
+    return;
+  }
   const state = shell.state;
   const text = [
     `candidate=${H2_TRIAL_CANDIDATE_ID}`,
@@ -449,13 +454,16 @@ async function copyTrialRecord(): Promise<void> {
     `threshold75=${state.world.triggeredThresholds.includes(75)}`,
     ...answers.map((answer, index) => `q${index + 1}=${answer}`),
   ].join("\n");
+  if (!navigator.clipboard) {
+    if (notice) notice.textContent = "自動コピーに対応していません。画面の記録を手動で保存してください。";
+    return;
+  }
   try {
     await navigator.clipboard.writeText(text);
-    shell.notice = "試遊記録をコピーしました。";
+    if (notice) notice.textContent = "試遊記録をコピーしました。";
   } catch {
-    shell.notice = "自動コピーできませんでした。画面の記録を手動で保存してください。";
+    if (notice) notice.textContent = "自動コピーできませんでした。回答は画面に残しています。手動で保存してください。";
   }
-  render();
 }
 
 function renderResult(): string {

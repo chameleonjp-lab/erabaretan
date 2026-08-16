@@ -28,16 +28,25 @@ jobs:
       name: h2-human-trial
       url: ${{ steps.deployment.outputs.page_url }}
     steps:
+      - name: Require main branch
+        run: |
+          if [ "$GITHUB_REF" != "refs/heads/main" ]; then
+            echo "This workflow must run from main." >&2
+            exit 1
+          fi
+
       - name: Check out the selected main commit
         uses: actions/checkout@v4
 
       - name: Set up Node.js
+        if: inputs.operation == 'publish'
         uses: actions/setup-node@v4
         with:
           node-version: 22
           cache: npm
 
       - name: Install dependencies
+        if: inputs.operation == 'publish'
         run: npm ci
 
       - name: Build H2 trial
@@ -47,14 +56,17 @@ jobs:
           TRIAL_SOURCE_SHA: ${{ github.sha }}
         run: npm run build:h2-trial
 
-      - name: Build cleanup site
+      - name: Restore normal site
         if: inputs.operation == 'cleanup'
         run: |
           rm -rf dist
           mkdir -p dist
+          cp web/index.html dist/index.html
+          cp web/styles.css dist/styles.css
+          cp -R web/generated dist/generated
           touch dist/.nojekyll
           printf '%s\n' 'User-agent: *' 'Disallow: /' > dist/robots.txt
-          printf '%s\n' '<!doctype html><html lang="ja"><head><meta name="robots" content="noindex,nofollow"><meta charset="utf-8"><title>Not found</title></head><body><p>試遊ページは公開されていません。</p></body></html>' > dist/404.html
+          printf '%s\n' '<!doctype html><html lang="ja"><head><meta charset="utf-8"><title>エラバレタン</title></head><body><p>ページが見つかりません。</p></body></html>' > dist/404.html
 
       - name: Configure GitHub Pages
         uses: actions/configure-pages@v5
@@ -83,4 +95,4 @@ jobs:
         if: inputs.operation == 'cleanup'
         run: |
           echo "## H2試遊ページを削除しました" >> "$GITHUB_STEP_SUMMARY"
-          echo "この実行のPagesは404だけを返します。" >> "$GITHUB_STEP_SUMMARY"
+          echo "通常Webを公開状態へ戻しました。" >> "$GITHUB_STEP_SUMMARY"

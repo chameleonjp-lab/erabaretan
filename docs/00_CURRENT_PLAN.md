@@ -318,6 +318,6 @@ P1-03「thresholds / scoring」、P1-04「rng / replay / hash」、P1-04b「P0-0
 
 ## P4-03 H2人間試遊の実行準備
 
-H2は正式v2へ昇格せず、通常Webから分離した一時Pagesで人間試遊を行う。公開はworkflow_dispatchによる手動実行だけにし、試遊用URLは固定の入口へ載せず、実行結果へ表示する。iPhone Safariで8試合以上を行い、試遊版の記録欄から匿名の手作業記録を保存する。試遊後は同じworkflowをcleanupで実行し、Pagesを404だけの状態へ戻す。
+H2は正式v2へ昇格せず、通常Webから分離した一時Pagesで人間試遊を行う。公開はworkflow_dispatchによる手動実行だけにし、試遊用URLは固定の入口へ載せず、実行結果へ表示する。iPhone Safariで8試合以上を行い、試遊版の記録欄から匿名の手作業記録を保存する。試遊後は同じworkflowをcleanupで実行し、通常WebをPagesへ戻す。
 
 詳細は[H2人間試遊手順](35_ALPHA_12_H2_HUMAN_TRIAL.md)を参照する。

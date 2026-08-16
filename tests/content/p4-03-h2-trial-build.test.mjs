@@ -22,12 +22,17 @@ test("trial source binds setup, executor, preview, and display to H2", () => {
   assert.match(main, /H2_TRIAL_SOURCE_SHA/);
   const battle = read("trials/p4-03-h2/src/battle-shell.ts");
   assert.match(battle, /世界へ8/);
+  assert.match(read("scripts/build-p4-03-h2-trial.mjs"), /build:web/);
+  assert.match(read("scripts/build-p4-03-h2-trial.mjs"), /web\/generated/);
 });
 
 test("trial uses eight fixed seeds and exposes a copyable record", () => {
   const local = read("trials/p4-03-h2/src/local-match.ts");
   assert.equal((local.match(/0000000000000000000000000000000[1-8]/g) ?? []).length, 8);
-  assert.match(read("trials/p4-03-h2/src/main.ts"), /data-copy-trial-record/);
+  const main = read("trials/p4-03-h2/src/main.ts");
+  assert.match(main, /data-copy-trial-record/);
+  assert.match(main, /5問すべてに回答/);
+  assert.match(main, /data-trial-record-notice/);
 });
 
 test("Pages publication is manual and supports cleanup", () => {
@@ -37,4 +42,7 @@ test("Pages publication is manual and supports cleanup", () => {
   assert.match(workflow, /actions\/deploy-pages@v4/);
   assert.match(workflow, /operation.*cleanup|cleanup.*operation/s);
   assert.match(workflow, /p403-h2-\$\{\{ github\.run_id \}\}/);
+  assert.match(workflow, /GITHUB_REF/);
+  assert.match(workflow, /Restore normal site/);
+  assert.match(workflow, /if: inputs\.operation == 'publish'/);
 });

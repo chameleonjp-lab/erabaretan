@@ -13,10 +13,14 @@ if (!/^[a-z0-9-]{8,64}$/.test(trialPath)) throw new Error("invalid TRIAL_PATH");
 
 rmSync("trials/p4-03-h2/generated", { recursive: true, force: true });
 rmSync("dist", { recursive: true, force: true });
+execFileSync("npm", ["run", "build:web"], { stdio: "inherit" });
 execFileSync("./node_modules/.bin/tsc", ["-p", "tsconfig.p4-03-h2-trial.json"], { stdio: "inherit" });
 
 const outputRoot = `dist/${trialPath}`;
 mkdirSync(outputRoot, { recursive: true });
+cpSync("web/index.html", "dist/index.html");
+cpSync("web/styles.css", "dist/styles.css");
+cpSync("web/generated", "dist/generated", { recursive: true });
 cpSync("trials/p4-03-h2/generated", `${outputRoot}/generated`, { recursive: true });
 cpSync("trials/p4-03-h2/index.html", `${outputRoot}/index.html`);
 cpSync("trials/p4-03-h2/styles.css", `${outputRoot}/styles.css`);

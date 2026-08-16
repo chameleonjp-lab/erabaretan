@@ -250,9 +250,10 @@ function gameStateConditionContext(state) {
         worldMaxDurability: state.world.maxDurability,
         activeField: state.activeField,
         respondingPlayerId: state.respondingPlayerId,
-        pendingAttackDefenderId: state.pendingAction?.kind === "RESPONSE_SELECTION"
+        pendingActionDefenderId: state.pendingAction?.kind === "RESPONSE_SELECTION"
             ? state.pendingAction.defendingPlayerId
             : null,
+        pendingAttackDefenderId: state.pendingAttack?.defendingPlayerId ?? null,
         pendingActionAttackId: state.pendingAction?.kind === "RESPONSE_SELECTION"
             ? state.pendingAction.pendingAttackId
             : null,
@@ -277,6 +278,9 @@ function publicStateConditionContext(state) {
         worldMaxDurability: state.world.maxDurability,
         activeField: state.activeField,
         respondingPlayerId: state.respondingPlayerId,
+        pendingActionDefenderId: state.pendingInteraction?.kind === "RESPONSE_SELECTION"
+            ? state.pendingInteraction.defendingPlayerId
+            : null,
         pendingAttackDefenderId: state.pendingInteraction?.kind === "RESPONSE_SELECTION"
             ? state.pendingInteraction.defendingPlayerId
             : null,
@@ -306,7 +310,9 @@ function validateInitial12CardConditions(input) {
     }
     if (condition.requiresPendingAttackDefender) {
         if (input.context.phase !== "RESPONSE_SELECTION"
+            || input.context.pendingActionDefenderId !== input.playerId
             || input.context.pendingAttackDefenderId !== input.playerId
+            || input.context.pendingActionDefenderId !== input.context.pendingAttackDefenderId
             || input.context.respondingPlayerId !== input.playerId
             || input.context.pendingActionAttackId === null
             || input.context.pendingAttackId === null
@@ -370,10 +376,14 @@ export function validateInitial12CardPlay(input) {
 /** Validates the same catalog condition contract against a player-scoped view. */
 export function validateInitial12CardPlayFromPublicState(input) {
     const ownPlayer = input.state.players.find((player) => player.playerId === input.playerId);
-    if (!ownPlayer || !ownPlayer.hand.cards?.some((card) => card.cardInstanceId === input.card.cardInstanceId)) {
+    const publicCard = ownPlayer?.hand.cards?.find((card) => card.cardInstanceId === input.card.cardInstanceId);
+    if (!publicCard) {
         return { ok: false, code: "CARD_NOT_IN_HAND", message: "card instance is not in the player's public hand" };
     }
-    const definition = INITIAL_12_CARD_BY_ID[input.card.cardDefinitionId];
+    if (publicCard.cardDefinitionId !== input.card.cardDefinitionId) {
+        return { ok: false, code: "INVALID_CARD", message: "public card definition does not match the player's hand" };
+    }
+    const definition = INITIAL_12_CARD_BY_ID[publicCard.cardDefinitionId];
     if (!definition)
         return { ok: false, code: "INVALID_CARD", message: "card definition is not in the alpha-12 catalog" };
     return validateInitial12CardConditions({

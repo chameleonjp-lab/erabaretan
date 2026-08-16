@@ -10,12 +10,15 @@ import {
   cardDescription,
   effectHint,
   handoffTargetForStateChange,
+  judgmentHint,
   modeLabel,
   nextWorldBoundary,
   phaseLabel,
+  previewJudgmentHint,
   roleLabel,
   requiresActionConfirmation,
   screenForPhase,
+  worldPreview,
 } from "../../web/src/battle-shell.ts";
 
 const setup = createAlpha12Setup({
@@ -77,6 +80,15 @@ test("P3-02 uses the production preview without changing the local match", () =>
   if (preview.status !== "READY") return;
   assert.equal(preview.certainty, "PARTIAL");
   assert.equal(preview.pendingAttackBaseDamage, 16);
+  assert.equal(preview.pendingAttackNoResponseDelta?.worldDurabilityDelta, -7);
+  assert.equal(preview.pendingAttackNoResponseDelta?.playerWorldDamageResponsibilityDeltas[playerId], 7);
+  const world = worldPreview(state, preview);
+  assert.deepEqual(world, { before: 100, after: 93, crossedThresholds: [], uncertain: true, basis: "NO_RESPONSE" });
+  const selection = previewJudgmentHint(state, playerId, preview);
+  assert.ok(selection);
+  assert.equal(selection.before.label, "拮抗");
+  assert.equal(selection.after.label, "拮抗");
+  assert.equal(selection.uncertain, true);
   assert.equal(state.revision, revision);
   assert.equal(state.phase, "ACTION_SELECTION");
 
@@ -90,6 +102,66 @@ test("P3-02 uses the production preview without changing the local match", () =>
     payload: { cardInstanceId: nullificationCard, playMode: "RELEASE" },
   });
   assert.equal(rejected.status, "REJECTED");
+});
+
+test("P3-03 keeps the judgment hint at the documented plus-or-minus five margin", () => {
+  const withHp = (p1Hp, p2Hp) => ({
+    ...setup.state,
+    players: {
+      ...setup.state.players,
+      P1: { ...setup.state.players.P1, hitPoints: p1Hp },
+      P2: { ...setup.state.players.P2, hitPoints: p2Hp },
+    },
+  });
+  assert.equal(judgmentHint(withHp(30, 24), "P1").label, "選定優勢");
+  assert.equal(judgmentHint(withHp(30, 25), "P1").label, "拮抗");
+  assert.equal(judgmentHint(withHp(30, 30), "P1").label, "拮抗");
+  assert.equal(judgmentHint(withHp(25, 30), "P1").label, "拮抗");
+  assert.equal(judgmentHint(withHp(24, 30), "P1").label, "選定劣勢");
+});
+
+test("P3-03 keeps the final judgment hint for defeat and world collapse previews", () => {
+  const base = createLocalMatch(6);
+  const attacker = base.activePlayerId;
+  assert.ok(attacker);
+  const defender = attacker === "P1" ? "P2" : "P1";
+  const starBreaker = base.players[attacker].hand.find(
+    (cardInstanceId) => base.cardInstances[cardInstanceId].cardDefinitionId === "attack.star-breaker.v1",
+  );
+  assert.ok(starBreaker);
+  const intent = {
+    commandType: "PLAY_CARD",
+    playerId: attacker,
+    payload: { cardInstanceId: starBreaker, playMode: "RELEASE", targetPlayerId: defender },
+  };
+
+  const lethalState = {
+    ...base,
+    players: { ...base.players, [defender]: { ...base.players[defender], hitPoints: 16 } },
+  };
+  const lethalPreview = previewAlpha12Command(lethalState, { kind: "PLAYER", playerId: attacker }, intent);
+  assert.equal(lethalPreview.status, "READY");
+  if (lethalPreview.status !== "READY") return;
+  assert.equal(lethalPreview.pendingAttackNoResponseDelta?.wouldFinishMatch, true);
+  const lethalHint = previewJudgmentHint(lethalState, attacker, lethalPreview);
+  assert.ok(lethalHint);
+  assert.equal(lethalHint.after.label, "選定優勢");
+
+  const collapseState = {
+    ...base,
+    world: { ...base.world, durability: 7, triggeredThresholds: [75, 50, 25] },
+    players: Object.fromEntries(Object.entries(base.players).map(([playerId, player]) => [
+      playerId,
+      { ...player, statusEffects: { ...player.statusEffects, fragileWorld: true } },
+    ])),
+  };
+  const collapsePreview = previewAlpha12Command(collapseState, { kind: "PLAYER", playerId: attacker }, intent);
+  assert.equal(collapsePreview.status, "READY");
+  if (collapsePreview.status !== "READY") return;
+  assert.equal(collapsePreview.pendingAttackNoResponseDelta?.worldCollapsed, true);
+  const collapseHint = previewJudgmentHint(collapseState, attacker, collapsePreview);
+  assert.ok(collapseHint);
+  assert.equal(collapseHint.after.label, "選定劣勢");
 });
 
 test("P3-01 explains whose action is needed without exposing the other hand", () => {
@@ -128,10 +200,13 @@ test("P3-01 inserts a private handoff before every new local viewer sees a hand"
   assert.match(mainSource, /data-response-card/);
   assert.match(mainSource, /data-rematch/);
   assert.match(mainSource, /card-description/);
+  assert.match(mainSource, /審定傾向/);
+  assert.match(mainSource, /世界 \$\{world\.before\}/);
   assert.match(styleSource, /\.card-action \{[^}]*min-height: 44px/s);
   assert.match(styleSource, /\.mini-select select \{[^}]*min-height: 44px/s);
   assert.match(styleSource, /body \{ min-width: 320px; overflow-x: hidden; \}/);
   assert.match(styleSource, /\.hand-grid \{[^}]*repeat\(2, minmax\(0, 1fr\)\)/s);
+  assert.match(styleSource, /\.judgment-hint \{/);
 });
 
 test("P3-01 local adapter carries a real attack through response and result flow", () => {

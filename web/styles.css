@@ -72,6 +72,7 @@ progress { display: block; width: 100%; height: 13px; margin: 16px 0 12px; accen
 .threshold.passed { color: #18241d; background: var(--green); border-color: var(--green); }
 .next-boundary { margin-left: auto; color: var(--accent-strong); font-size: 0.78rem; }
 .field-note { margin: 12px 0 0; color: #d6c49d; font-size: 0.82rem; }
+.judgment-note { margin: 12px 0 0; color: var(--muted); font-size: 0.72rem; line-height: 1.5; }
 
 .player-strip { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; margin: 12px 0; }
 .player-panel { padding: 13px; }
@@ -80,6 +81,10 @@ progress { display: block; width: 100%; height: 13px; margin: 16px 0 12px; accen
 .hp-line { justify-content: start; margin-top: 12px; color: var(--muted); font-size: 0.82rem; }
 .hp-line strong { color: var(--ink); font-size: 1.25rem; }
 .mini-stats { justify-content: start; flex-wrap: wrap; margin-top: 12px; color: var(--muted); font-size: 0.68rem; }
+.judgment-hint { margin-top: 11px; padding-top: 9px; border-top: 1px solid var(--line); font-size: 0.72rem; font-weight: 800; }
+.judgment-hint.advantage { color: #b9e6c5; }
+.judgment-hint.even { color: var(--accent-strong); }
+.judgment-hint.disadvantage { color: #ffc4bb; }
 
 .decision-area { margin: 12px 0; }
 .decision-panel { padding: 18px; }

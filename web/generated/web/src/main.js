@@ -1,6 +1,6 @@
 import { INITIAL_12_CARD_BY_ID, previewAlpha12Command, } from "../../packages/content/src/index.js";
 import { projectPublicState, summarizeMatch, } from "../../packages/game-core/src/index.js";
-import { battlePrompt, actionDescription, cardDescription, effectHint, handoffTargetForStateChange, modeLabel, phaseLabel, playerLabel, roleLabel, requiresActionConfirmation, screenForPhase, viewerForGameState, } from "./battle-shell.js";
+import { battlePrompt, actionDescription, cardDescription, effectHint, handoffTargetForStateChange, judgmentHint, modeLabel, phaseLabel, playerLabel, previewJudgmentHint, roleLabel, requiresActionConfirmation, screenForPhase, viewerForGameState, worldPreview, } from "./battle-shell.js";
 import { applyLocalCommand, createLocalMatch } from "./local-match.js";
 const appElement = document.querySelector("#app");
 if (!appElement)
@@ -108,6 +108,9 @@ function previewLabel(state, intent, result) {
     if (result.status === "UNAVAILABLE")
         return "予測できません";
     const parts = [];
+    const isCardAction = intent.commandType === "PLAY_CARD" || intent.commandType === "SELECT_RESPONSE";
+    const cardInstanceId = isCardAction ? intent.payload.cardInstanceId : undefined;
+    const cardDefinitionId = cardInstanceId ? state.cardInstances[cardInstanceId]?.cardDefinitionId : undefined;
     if (intent.commandType === "PLAY_CARD" && result.certainty === "PARTIAL" && result.pendingAttackBaseDamage !== undefined) {
         parts.push(`相手へ${result.pendingAttackBaseDamage}（応答で変化）`);
     }
@@ -117,17 +120,25 @@ function previewLabel(state, intent, result) {
         if (hitPointDelta !== 0)
             parts.push(`${targetPlayerId === intent.playerId ? "自分" : "相手"}HP ${signed(hitPointDelta)}`);
     }
-    if (result.delta.worldDurabilityDelta < 0)
-        parts.push(`世界へ${Math.abs(result.delta.worldDurabilityDelta)}`);
-    if (result.delta.worldDurabilityDelta > 0)
-        parts.push(`世界へ${result.delta.worldDurabilityDelta}回復`);
-    if (result.delta.crossedWorldThresholds.length > 0) {
-        parts.push(`${result.delta.crossedWorldThresholds.join("・")}境界`);
+    if (intent.commandType === "SELECT_RESPONSE" && cardDefinitionId) {
+        parts.push(actionDescription(cardDefinitionId, "RESPONSE"));
+    }
+    if (isCardAction) {
+        const world = worldPreview(state, result);
+        if (world) {
+            parts.push(`世界 ${world.before} → ${world.after}${world.uncertain ? "（応答で変化）" : ""}`);
+            if (world.crossedThresholds.length > 0) {
+                parts.push(`${world.crossedThresholds.join("・")}境界を通過`);
+            }
+        }
+        const judgment = previewJudgmentHint(state, intent.playerId, result);
+        if (judgment) {
+            parts.push(`審定傾向 ${judgment.before.label} → ${judgment.after.label}${judgment.uncertain ? "（応答で変化）" : ""}`);
+        }
     }
     if (intent.commandType === "DISCARD_FOR_ACTION")
         parts.push("この手番を終了");
     if (parts.length === 0 && intent.commandType === "PLAY_CARD") {
-        const cardDefinitionId = state.cardInstances[intent.payload.cardInstanceId]?.cardDefinitionId;
         parts.push(actionDescription(cardDefinitionId ?? "", intent.payload.playMode));
     }
     if (parts.length === 0)
@@ -146,7 +157,7 @@ function renderCardActions(state, card, definition) {
         };
         const result = previewResult(state, intent);
         const disabled = shell.pendingAction || result.status === "REJECTED" ? " disabled" : "";
-        return `<div class="action-row"><button class="card-action" data-response-card="${escapeHtml(card.cardInstanceId)}" title="${escapeHtml(previewStatusFromResult(result))}"${disabled}>応答する</button><span class="action-hint">${escapeHtml(actionDescription(definition.cardDefinitionId, "RESPONSE"))}</span></div>`;
+        return `<div class="action-row"><button class="card-action" data-response-card="${escapeHtml(card.cardInstanceId)}" title="${escapeHtml(previewStatusFromResult(result))}"${disabled}>応答する</button><span class="action-hint">${escapeHtml(previewLabel(state, intent, result))}</span></div>`;
     }
     if (state.phase !== "ACTION_SELECTION" || state.activePlayerId !== viewerId)
         return "";
@@ -203,13 +214,15 @@ function renderCard(state, card) {
     ${renderCardActions(state, card, definition)}
   </article>`;
 }
-function renderPlayers(publicState) {
+function renderPlayers(state, publicState) {
     return `<section class="player-strip" aria-label="プレイヤー情報">${publicState.players.map((player) => {
         const current = player.playerId === (publicState.respondingPlayerId ?? publicState.activePlayerId);
+        const hint = judgmentHint(state, player.playerId);
         return `<article class="player-panel ${current ? "is-current" : ""}">
       <div class="player-name">${escapeHtml(playerLabel(player.playerId))}${current ? "<span class=\"turn-badge\">いま</span>" : ""}</div>
       <div class="hp-line"><span>体力</span><strong>${player.hp}</strong><span>/ ${player.maxHp}</span></div>
       <div class="mini-stats"><span>世界損傷 ${player.worldDamageResponsibility}</span><span>世界再生 ${player.effectiveWorldRestore}</span><span>手札 ${player.hand.count}</span></div>
+      <div class="judgment-hint ${hint.level.toLowerCase()}">審定傾向：${escapeHtml(hint.label)}</div>
     </article>`;
     }).join("")}</section>`;
 }
@@ -219,6 +232,7 @@ function renderWorld(publicState) {
     <div class="world-heading"><div><span class="eyebrow">世界律：砕けゆく原初界</span><h2>共有世界</h2></div><strong>${world.durability}<small> / ${world.maxDurability}</small></strong></div>
     <progress max="${world.maxDurability}" value="${world.durability}" aria-label="世界耐久"></progress>
     <div class="thresholds"><span class="threshold ${world.triggeredThresholds.includes(75) ? "passed" : ""}">75</span><span class="threshold ${world.triggeredThresholds.includes(50) ? "passed" : ""}">50</span><span class="threshold ${world.triggeredThresholds.includes(25) ? "passed" : ""}">25</span><span class="next-boundary">${escapeHtml(effectHint(publicState))}</span></div>
+    <p class="judgment-note">審定傾向は、今の公開状態で審定した場合の目安です。正確な点数は試合終了後に表示します。</p>
     ${publicState.activeField ? `<p class="field-note">フィールド：${escapeHtml(INITIAL_12_CARD_BY_ID[publicState.activeField.fieldDefinitionId]?.displayName ?? publicState.activeField.fieldDefinitionId)}</p>` : ""}
   </section>`;
 }
@@ -255,9 +269,9 @@ function renderBattle() {
     const ownPlayer = publicState.players.find((player) => player.playerId === viewerId);
     const hand = ownPlayer?.hand.cards ?? [];
     return `<main class="screen battle-screen">
-    <header class="topbar"><div><span class="eyebrow">エラバレタン / P3-02</span><h1>砕けゆく原初界</h1></div><span class="phase-chip">${escapeHtml(phaseLabel(publicState.phase))}</span></header>
+    <header class="topbar"><div><span class="eyebrow">エラバレタン / P3-03</span><h1>砕けゆく原初界</h1></div><span class="phase-chip">${escapeHtml(phaseLabel(publicState.phase))}</span></header>
     ${renderWorld(publicState)}
-    ${renderPlayers(publicState)}
+    ${renderPlayers(shell.state, publicState)}
     <section class="decision-area">${renderBattleControls(shell.state, publicState, viewerId)}</section>
     <section class="hand-section"><div class="section-heading"><div><span class="eyebrow">${escapeHtml(playerLabel(viewerId))}の手札</span><h2>カードを選ぶ</h2></div><span>${hand.length}枚</span></div><div class="hand-grid">${hand.length ? hand.map((card) => renderCard(shell.state, card)).join("") : "<p class=\"empty-note\">手札はありません。</p>"}</div></section>
     ${shell.notice ? `<p class="notice" role="status">${escapeHtml(shell.notice)}</p>` : ""}
@@ -284,7 +298,7 @@ function renderResult() {
   </main>`;
 }
 function renderTitle() {
-    return `<main class="screen title-screen"><div class="title-mark"><span class="eyebrow">短時間対戦カードゲーム</span><h1>エラバレタン</h1><p>相手を倒すか、世界を守るか。最後に神が戦い方を査定します。</p></div><div class="title-actions"><button class="primary-button wide" data-world-law>世界律を確認する</button><p class="small-note">P3-02 手札・行動確認 / 2人で交互に操作</p></div></main>`;
+    return `<main class="screen title-screen"><div class="title-mark"><span class="eyebrow">短時間対戦カードゲーム</span><h1>エラバレタン</h1><p>相手を倒すか、世界を守るか。最後に神が戦い方を査定します。</p></div><div class="title-actions"><button class="primary-button wide" data-world-law>世界律を確認する</button><p class="small-note">P3-03 世界予測・審定ヒント / 2人で交互に操作</p></div></main>`;
 }
 function renderWorldLaw() {
     return `<main class="screen law-screen"><span class="eyebrow">世界律確認</span><h1>砕けゆく原初界</h1><p class="lead">強いカードは相手だけでなく、共有世界にも影響します。世界を壊しすぎると、戦闘に勝っても神の評価を落とします。</p><div class="law-rules"><div><strong>75</strong><span>世界が傷つき、守りにくくなる</span></div><div><strong>50</strong><span>世界を戻した者が評価される</span></div><div><strong>25</strong><span>世界が脆くなり、危険が増える</span></div></div><p class="small-note">まずは解放と抑制を使い分け、相手と世界の両方を見てください。</p><button class="primary-button wide" data-start-battle>戦闘を開始する</button></main>`;

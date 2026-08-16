@@ -12,5 +12,15 @@ export function previewAlpha12Command(
   viewer: StateViewer,
   intent: PreviewCommandIntent,
 ): PreviewResult {
-  return previewCommand(state, viewer, intent, executeAlpha12Command);
+  return previewCommand(state, viewer, intent, executeAlpha12Command, (pendingState) => {
+    const playerId = pendingState.respondingPlayerId;
+    if (!playerId) throw new Error("pending attack response player is required");
+    return executeAlpha12Command(pendingState, {
+      commandId: `preview.no-response.${pendingState.revision}.${pendingState.turnSequence}.${playerId}`,
+      playerId,
+      expectedRevision: pendingState.revision,
+      commandType: "ACCEPT_DAMAGE",
+      payload: {},
+    });
+  });
 }

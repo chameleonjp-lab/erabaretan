@@ -11,5 +11,6 @@
     "outDir": "web/generated",
     "sourceMap": false
   },
-  "include": ["packages/**/*.ts", "web/src/**/*.ts"]
+  "include": ["packages/**/*.ts", "web/src/**/*.ts"],
+  "exclude": ["packages/content/src/balance/**/*.ts"]
 }

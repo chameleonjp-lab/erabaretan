@@ -1,4 +1,5 @@
 import type { Command } from "../../../game-core/src/commands/types.ts";
+import type { CommandValidationOptions } from "../../../game-core/src/commands/validate.ts";
 import {
   ALPHA_12_RULESET,
   advanceToNextTurnStart,
@@ -11,21 +12,51 @@ import {
   type GameState,
   type PlayerId,
   type PublicGameState,
+  type RulesetSnapshot,
 } from "../../../game-core/src/index.ts";
-import { INITIAL_12_CARD_BY_ID, INITIAL_12_CARD_DEFINITIONS } from "../cards/initial-12.ts";
+import {
+  INITIAL_12_CATALOG,
+  INITIAL_12_CARD_DEFINITIONS,
+  createInitial12CommandValidationOptions,
+  type Initial12Catalog,
+} from "../cards/initial-12.ts";
 import {
   alpha12CpuCommandId,
   enumerateAlpha12CpuActions,
   materializeAlpha12CpuCommand,
   type CpuActionIntent,
 } from "../cpu/legal-actions.ts";
-import { createAlpha12Setup } from "../setup/alpha-12.ts";
+import {
+  ALPHA_12_CATALOG_HASH,
+  ALPHA_12_ENGINE_VERSION,
+  createAlpha12Setup,
+} from "../setup/alpha-12.ts";
 import { executeAlpha12Command } from "../setup/alpha-12-command-executor.ts";
 
 /** The first P4-02 policy is intentionally simple and public-state-only. */
 export const ALPHA_12_CPU_POLICY_ID = "public-greedy-v1" as const;
 export const ALPHA_12_SIMULATION_VERSION = "simulation-metrics.alpha-12.v1" as const;
 export const DEFAULT_MAX_SIMULATION_STEPS = 4096;
+
+export interface Alpha12SimulationProfile {
+  readonly catalog: Initial12Catalog;
+  readonly ruleset: RulesetSnapshot;
+  readonly catalogHash: string;
+  readonly engineVersion: string;
+  readonly simulationVersion: string;
+  readonly cpuPolicyId: string;
+  readonly validationOptions: CommandValidationOptions;
+}
+
+export const ALPHA_12_V1_PROFILE: Alpha12SimulationProfile = {
+  catalog: INITIAL_12_CATALOG,
+  ruleset: ALPHA_12_RULESET,
+  catalogHash: ALPHA_12_CATALOG_HASH,
+  engineVersion: ALPHA_12_ENGINE_VERSION,
+  simulationVersion: ALPHA_12_SIMULATION_VERSION,
+  cpuPolicyId: ALPHA_12_CPU_POLICY_ID,
+  validationOptions: createInitial12CommandValidationOptions(),
+};
 
 const THRESHOLDS = [75, 50, 25] as const;
 const OATH_OF_RENEWAL_ID = "intervention.oath-of-renewal.v1";
@@ -65,7 +96,7 @@ export interface Alpha12SimulationMatchRecord {
   readonly matchId: string;
   readonly seed: string;
   readonly rulesetId: string;
-  readonly cpuPolicyId: typeof ALPHA_12_CPU_POLICY_ID;
+  readonly cpuPolicyId: string;
   readonly endKind: SimulationEndKind;
   readonly finalStateHash: string;
   readonly firstPlayerId: PlayerId;
@@ -125,9 +156,9 @@ export interface Alpha12SimulationMetrics {
 }
 
 export interface Alpha12SimulationResult {
-  readonly simulationVersion: typeof ALPHA_12_SIMULATION_VERSION;
+  readonly simulationVersion: string;
   readonly rulesetId: string;
-  readonly cpuPolicyId: typeof ALPHA_12_CPU_POLICY_ID;
+  readonly cpuPolicyId: string;
   readonly matches: readonly Alpha12SimulationMatchRecord[];
   readonly metrics: Alpha12SimulationMetrics;
 }
@@ -146,8 +177,8 @@ function ratio(numerator: number, denominator: number): SimulationRate {
   return denominator === 0 ? null : numerator / denominator;
 }
 
-function emptyCardCounts(): Record<CardDefinitionId, number> {
-  return Object.fromEntries(INITIAL_12_CARD_DEFINITIONS.map((definition) => [definition.cardDefinitionId, 0]));
+function emptyCardCounts(definitions: typeof INITIAL_12_CARD_DEFINITIONS = INITIAL_12_CARD_DEFINITIONS): Record<CardDefinitionId, number> {
+  return Object.fromEntries(definitions.map((definition) => [definition.cardDefinitionId, 0]));
 }
 
 function emptyThresholdRounds(): { -readonly [Key in SimulationThreshold]: number | null } {
@@ -182,12 +213,12 @@ function observeThresholds(state: GameState, rounds: { -readonly [Key in Simulat
   }
 }
 
-function createCounters(): MutableMatchCounters {
+function createCounters(definitions: typeof INITIAL_12_CARD_DEFINITIONS = INITIAL_12_CARD_DEFINITIONS): MutableMatchCounters {
   return {
     playedCardCount: 0,
     releaseCount: 0,
     restrainCount: 0,
-    cardUsage: emptyCardCounts(),
+    cardUsage: emptyCardCounts(definitions),
     oathUsers: new Set(),
     discardForActionCount: 0,
     actionDecisionCount: 0,
@@ -211,14 +242,14 @@ function playerById(view: PublicGameState, playerId: PlayerId | null) {
  * Chooses from already validated public candidates. The score is deliberately
  * a small heuristic, not a balance change or a hidden-state search.
  */
-function scorePublicAction(view: PublicGameState, action: CpuActionIntent): number {
+function scorePublicAction(view: PublicGameState, action: CpuActionIntent, catalog: Initial12Catalog): number {
   if (action.commandType === "SURRENDER") return -10000;
   if (action.commandType === "ACCEPT_DAMAGE") return 0;
   if (action.commandType === "DISCARD_OVERFLOW") return 1;
   if (action.commandType === "DISCARD_FOR_ACTION") return view.world.durability <= 75 ? 35 : 4;
 
   const cardDefinitionId = actionCardDefinitionId(view, action);
-  const definition = cardDefinitionId ? INITIAL_12_CARD_BY_ID[cardDefinitionId] : undefined;
+  const definition = cardDefinitionId ? catalog.byId[cardDefinitionId] : undefined;
   if (!definition) return -1000;
 
   if (action.commandType === "SELECT_RESPONSE") {
@@ -251,20 +282,24 @@ function scorePublicAction(view: PublicGameState, action: CpuActionIntent): numb
   return score;
 }
 
-function choosePublicGreedyAction(view: PublicGameState, actions: readonly CpuActionIntent[]): CpuActionIntent | undefined {
+function choosePublicGreedyAction(
+  view: PublicGameState,
+  actions: readonly CpuActionIntent[],
+  catalog: Initial12Catalog,
+): CpuActionIntent | undefined {
   return actions.reduce<CpuActionIntent | undefined>((best, action) => {
-    if (!best || scorePublicAction(view, action) > scorePublicAction(view, best)) return action;
+    if (!best || scorePublicAction(view, action, catalog) > scorePublicAction(view, best, catalog)) return action;
     return best;
   }, undefined);
 }
 
-function commandForPublicGreedyAction(state: GameState): Command {
+function commandForPublicGreedyAction(state: GameState, catalog: Initial12Catalog): Command {
   const playerId = state.phase === "RESPONSE_SELECTION" ? state.respondingPlayerId : state.activePlayerId;
   if (!playerId) throw new Error(`simulation cannot choose a player in ${state.phase}`);
   const projected = projectPublicState(state, { kind: "PLAYER", playerId });
   if (!projected.ok) throw new Error(`simulation public projection failed: ${projected.code}`);
-  const actions = enumerateAlpha12CpuActions(projected.state, playerId);
-  const action = choosePublicGreedyAction(projected.state, actions);
+  const actions = enumerateAlpha12CpuActions(projected.state, playerId, catalog);
+  const action = choosePublicGreedyAction(projected.state, actions, catalog);
   if (!action) throw new Error(`simulation found no legal action in ${state.phase}`);
   return materializeAlpha12CpuCommand(
     action,
@@ -273,11 +308,23 @@ function commandForPublicGreedyAction(state: GameState): Command {
   );
 }
 
-function runMatch(seed: string, matchIndex: number, options: Required<Pick<Alpha12SimulationOptions, "matchIdPrefix" | "maxStepsPerMatch">>): Alpha12SimulationMatchRecord {
+function runMatch(
+  seed: string,
+  matchIndex: number,
+  options: Required<Pick<Alpha12SimulationOptions, "matchIdPrefix" | "maxStepsPerMatch">>,
+  profile: Alpha12SimulationProfile,
+): Alpha12SimulationMatchRecord {
   const matchId = `${options.matchIdPrefix}.${String(matchIndex + 1).padStart(4, "0")}`;
-  const setup = createAlpha12Setup({ matchId, seed });
+  const setup = createAlpha12Setup({
+    matchId,
+    seed,
+    catalog: profile.catalog,
+    ruleset: profile.ruleset,
+    catalogHash: profile.catalogHash,
+    engineVersion: profile.engineVersion,
+  });
   let state = setup.state;
-  const counters = createCounters();
+  const counters = createCounters(profile.catalog.definitions);
   const thresholdRounds = emptyThresholdRounds();
   let steps = 0;
   observeThresholds(state, thresholdRounds);
@@ -308,7 +355,7 @@ function runMatch(seed: string, matchIndex: number, options: Required<Pick<Alpha
     }
 
     const before = state;
-    const command = commandForPublicGreedyAction(state);
+    const command = commandForPublicGreedyAction(state, profile.catalog);
     const cardDefinitionId = cardDefinitionForCommand(before, command);
     if (before.phase === "ACTION_SELECTION") {
       if (command.commandType === "PLAY_CARD" || command.commandType === "DISCARD_FOR_ACTION") {
@@ -328,7 +375,7 @@ function runMatch(seed: string, matchIndex: number, options: Required<Pick<Alpha
       }
     }
 
-    const execution = executeAlpha12Command(state, command);
+    const execution = executeAlpha12Command(state, command, profile.validationOptions, profile.catalog);
     if (!execution.accepted || execution.replayed) {
       throw new Error(`simulation command was not accepted: ${execution.error?.code ?? "REPLAYED"}`);
     }
@@ -350,7 +397,7 @@ function runMatch(seed: string, matchIndex: number, options: Required<Pick<Alpha
     matchId,
     seed,
     rulesetId: state.ruleset.rulesetId,
-    cpuPolicyId: ALPHA_12_CPU_POLICY_ID,
+    cpuPolicyId: profile.cpuPolicyId,
     endKind,
     finalStateHash: hashGameState(state),
     firstPlayerId: setup.firstPlayerId,
@@ -373,9 +420,12 @@ function runMatch(seed: string, matchIndex: number, options: Required<Pick<Alpha
   };
 }
 
-function aggregateMetrics(matches: readonly Alpha12SimulationMatchRecord[]): Alpha12SimulationMetrics {
+function aggregateMetrics(
+  matches: readonly Alpha12SimulationMatchRecord[],
+  definitions: typeof INITIAL_12_CARD_DEFINITIONS,
+): Alpha12SimulationMetrics {
   const endKindCounts = emptyEndKindCounts();
-  const cardCounts = emptyCardCounts();
+  const cardCounts = emptyCardCounts(definitions);
   const thresholdReachedCounts = emptyThresholdCounts();
   let totalRounds = 0;
   let worldCollapseCount = 0;
@@ -427,7 +477,7 @@ function aggregateMetrics(matches: readonly Alpha12SimulationMatchRecord[]): Alp
     oathOfRenewalSurvivalCount += match.oathOfRenewalSurvivalCount;
     discardForActionCount += match.discardForActionCount;
     actionDecisionCount += match.actionDecisionCount;
-    for (const definition of INITIAL_12_CARD_DEFINITIONS) {
+    for (const definition of definitions) {
       cardCounts[definition.cardDefinitionId] += match.cardUsage[definition.cardDefinitionId] ?? 0;
     }
     for (const threshold of THRESHOLDS) {
@@ -436,7 +486,7 @@ function aggregateMetrics(matches: readonly Alpha12SimulationMatchRecord[]): Alp
   }
 
   const cardUsage: Record<CardDefinitionId, Alpha12CardUsage> = {};
-  for (const definition of INITIAL_12_CARD_DEFINITIONS) {
+  for (const definition of definitions) {
     const cardDefinitionId = definition.cardDefinitionId;
     cardUsage[cardDefinitionId] = {
       count: cardCounts[cardDefinitionId],
@@ -483,19 +533,32 @@ function aggregateMetrics(matches: readonly Alpha12SimulationMatchRecord[]): Alp
   };
 }
 
-/** Runs deterministic CPU-vs-CPU matches and returns replay-friendly per-match records plus aggregate metrics. */
-export function runAlpha12Simulation(options: Alpha12SimulationOptions): Alpha12SimulationResult {
+/** Runs deterministic CPU-vs-CPU matches for an explicit content profile. */
+export function runAlpha12SimulationWithProfile(
+  options: Alpha12SimulationOptions,
+  profile: Alpha12SimulationProfile,
+): Alpha12SimulationResult {
   const matchIdPrefix = options.matchIdPrefix ?? "simulation.alpha-12";
   const maxStepsPerMatch = options.maxStepsPerMatch ?? DEFAULT_MAX_SIMULATION_STEPS;
   if (!Number.isSafeInteger(maxStepsPerMatch) || maxStepsPerMatch <= 0) {
     throw new Error("maxStepsPerMatch must be a positive safe integer");
   }
-  const matches = options.seeds.map((seed, matchIndex) => runMatch(seed, matchIndex, { matchIdPrefix, maxStepsPerMatch }));
+  const matches = options.seeds.map((seed, matchIndex) => runMatch(
+    seed,
+    matchIndex,
+    { matchIdPrefix, maxStepsPerMatch },
+    profile,
+  ));
   return {
-    simulationVersion: ALPHA_12_SIMULATION_VERSION,
-    rulesetId: matches[0]?.rulesetId ?? ALPHA_12_RULESET.rulesetId,
-    cpuPolicyId: ALPHA_12_CPU_POLICY_ID,
+    simulationVersion: profile.simulationVersion,
+    rulesetId: matches[0]?.rulesetId ?? profile.ruleset.rulesetId,
+    cpuPolicyId: profile.cpuPolicyId,
     matches,
-    metrics: aggregateMetrics(matches),
+    metrics: aggregateMetrics(matches, profile.catalog.definitions),
   };
+}
+
+/** Runs the published alpha-12 V1 profile. */
+export function runAlpha12Simulation(options: Alpha12SimulationOptions): Alpha12SimulationResult {
+  return runAlpha12SimulationWithProfile(options, ALPHA_12_V1_PROFILE);
 }

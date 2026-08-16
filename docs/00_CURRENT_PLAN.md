@@ -79,6 +79,7 @@
 16. [result judgment / summary](31_RESULT_JUDGMENT_SUMMARY_V1.md)
 17. [CPU legal actions](32_CPU_LEGAL_ACTIONS_V1.md)
 18. [P4-02 simulation metrics](33_SIMULATION_METRICS_V1.md)
+19. [P4-03 balance pass H2](34_ALPHA_12_BALANCE_PASS_H2.md)
 
 状態遷移、補充順、手札上限、命令受理、効果、世界境界、終了、採点、リプレイ、公開情報境界、不変条件の詳細を扱う。
 
@@ -310,4 +311,4 @@ P0では次を揃える。
 - [game-core world boundaries / terminal / scoring V1](24_GAME_CORE_WORLD_BOUNDARIES_TERMINAL_V1.md)
 - [game-core RNG / replay / state hash V1](25_GAME_CORE_RNG_REPLAY_HASH_V1.md)
 
-P1-03「thresholds / scoring」、P1-04「rng / replay / hash」、P1-04b「P0-06 golden manifest・実行境界・fixtureバイト列の訂正」、P1-05「projection / preview / summary」、P2-01「basic fixtures」、P2-02「adversarial fixtures」、P2-03「invariant / secrecy tests」、P3-01「battle shell」、P3-02「hand / action UX」、P3-03「world preview / judgment hint」、P3-04「result judgment / summary」、P4-01「CPU legal actions」の実装は完了した。旧ハッシュ値は履歴として隔離し、現行manifestを正本付属データとして扱う。実ブラウザ・iPhone縦画面の手動確認は公開前の停止条件として残し、次はP4-03「balance pass」へ進む。
+P1-03「thresholds / scoring」、P1-04「rng / replay / hash」、P1-04b「P0-06 golden manifest・実行境界・fixtureバイト列の訂正」、P1-05「projection / preview / summary」、P2-01「basic fixtures」、P2-02「adversarial fixtures」、P2-03「invariant / secrecy tests」、P3-01「battle shell」、P3-02「hand / action UX」、P3-03「world preview / judgment hint」、P3-04「result judgment / summary」、P4-01「CPU legal actions」の実装は完了した。旧ハッシュ値は履歴として隔離し、現行manifestを正本付属データとして扱う。実ブラウザ・iPhone縦画面の手動確認は公開前の停止条件として残し、P4-03 H2実験の自動門を通過した。正式v2化の前に、人間試遊とSol・Highの独立最終レビューを実施する。

@@ -171,7 +171,14 @@ export const INITIAL_12_CARD_DEFINITIONS = [
         conditions: { RELEASE: { ...actionCondition, handSizeAtLeast: 2 } },
     },
 ];
-export const INITIAL_12_CARD_BY_ID = Object.fromEntries(INITIAL_12_CARD_DEFINITIONS.map((definition) => [definition.cardDefinitionId, definition]));
+export function createInitial12Catalog(definitions) {
+    return {
+        definitions,
+        byId: Object.fromEntries(definitions.map((definition) => [definition.cardDefinitionId, definition])),
+    };
+}
+export const INITIAL_12_CATALOG = createInitial12Catalog(INITIAL_12_CARD_DEFINITIONS);
+export const INITIAL_12_CARD_BY_ID = INITIAL_12_CATALOG.byId;
 function resolveTarget(target, input) {
     if (target === "SELF")
         return { targetKind: "PLAYER", playerId: input.ownerPlayerId };
@@ -188,8 +195,8 @@ function resolveTarget(target, input) {
         throw new Error("pendingAttackId is required for a response effect");
     return { targetKind: "CURRENT_PENDING_ATTACK", pendingAttackId: input.pendingAttackId };
 }
-export function buildInitial12CardEffects(input) {
-    const definition = INITIAL_12_CARD_BY_ID[input.cardDefinitionId];
+export function buildInitial12CardEffects(input, catalog = INITIAL_12_CATALOG) {
+    const definition = catalog.byId[input.cardDefinitionId];
     if (!definition)
         throw new Error(`Unknown initial card definition: ${input.cardDefinitionId}`);
     const templates = definition.modes[input.mode];
@@ -356,14 +363,14 @@ function validateInitial12CardConditions(input) {
  * knowledge into game-core. The command layer can call this after the generic
  * command shape/ownership checks have passed.
  */
-export function validateInitial12CardPlay(input) {
+export function validateInitial12CardPlay(input, catalog = INITIAL_12_CATALOG) {
     const card = input.state.cardInstances[input.cardInstanceId];
     if (!card)
         return { ok: false, code: "INVALID_CARD", message: "card instance does not exist" };
     if (card.ownerPlayerId !== input.playerId || !input.state.cardZones.hands[input.playerId]?.includes(input.cardInstanceId)) {
         return { ok: false, code: "CARD_NOT_IN_HAND", message: "card instance is not in the player's hand" };
     }
-    const definition = INITIAL_12_CARD_BY_ID[card.cardDefinitionId];
+    const definition = catalog.byId[card.cardDefinitionId];
     if (!definition)
         return { ok: false, code: "INVALID_CARD", message: "card definition is not in the alpha-12 catalog" };
     return validateInitial12CardConditions({
@@ -377,7 +384,7 @@ export function validateInitial12CardPlay(input) {
     });
 }
 /** Validates the same catalog condition contract against a player-scoped view. */
-export function validateInitial12CardPlayFromPublicState(input) {
+export function validateInitial12CardPlayFromPublicState(input, catalog = INITIAL_12_CATALOG) {
     const ownPlayer = input.state.players.find((player) => player.playerId === input.playerId);
     const publicCard = ownPlayer?.hand.cards?.find((card) => card.cardInstanceId === input.card.cardInstanceId);
     if (!publicCard) {
@@ -386,7 +393,7 @@ export function validateInitial12CardPlayFromPublicState(input) {
     if (publicCard.cardDefinitionId !== input.card.cardDefinitionId) {
         return { ok: false, code: "INVALID_CARD", message: "public card definition does not match the player's hand" };
     }
-    const definition = INITIAL_12_CARD_BY_ID[publicCard.cardDefinitionId];
+    const definition = catalog.byId[publicCard.cardDefinitionId];
     if (!definition)
         return { ok: false, code: "INVALID_CARD", message: "card definition is not in the alpha-12 catalog" };
     return validateInitial12CardConditions({
@@ -399,15 +406,18 @@ export function validateInitial12CardPlayFromPublicState(input) {
         discardCardInstanceId: input.discardCardInstanceId,
     });
 }
-export const initial12CommandValidationOptions = {
-    cardConditionValidator: (input) => {
-        const validation = validateInitial12CardPlay(input);
-        if (validation.ok === true)
-            return { ok: true };
-        return {
-            ok: false,
-            code: validation.code === "INVALID_TARGET" ? "INVALID_TARGET" : "CARD_CONDITION_NOT_MET",
-            message: validation.message,
-        };
-    },
-};
+export function createInitial12CommandValidationOptions(catalog = INITIAL_12_CATALOG) {
+    return {
+        cardConditionValidator: (input) => {
+            const validation = validateInitial12CardPlay(input, catalog);
+            if (validation.ok === true)
+                return { ok: true };
+            return {
+                ok: false,
+                code: validation.code === "INVALID_TARGET" ? "INVALID_TARGET" : "CARD_CONDITION_NOT_MET",
+                message: validation.message,
+            };
+        },
+    };
+}
+export const initial12CommandValidationOptions = createInitial12CommandValidationOptions();

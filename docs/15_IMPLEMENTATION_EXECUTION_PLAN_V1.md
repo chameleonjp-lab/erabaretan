@@ -885,4 +885,13 @@ P4-01では、`PublicGameState`を入口にしたCPU合法手列挙、`materiali
 
 P4-02では、`runAlpha12Simulation`による固定seed反復、公開情報だけで選ぶ`public-greedy-v1`方針、`TURN_START`・応答・手札超過を含む既存executorの試合ループ、終端summary検証を追加した。試合ごとにseed、rulesetId、方針ID、終了種別、最終状態ハッシュ、終端ラウンド、完了ラウンド、75・50・25到達ラウンド、世界崩壊・最大ラウンド、解放・抑制、カード使用、先攻選定、戦闘・選定一致、誓約、`DISCARD_FOR_ACTION`を記録する。分母0の率は`null`とし、誓約生存は`(matchId, playerId)`単位で終端HPを判定する。
 
-`tests/content/p4-02-simulation-metrics.test.mjs`を追加し、同一seed・matchId・方針の完全一致、最終ハッシュ形式、指標分母、0件率、閾値到達順を固定した。通常の直接ダメージを応答待ちとして解決しようとする既存カードテンプレートも同時に検出し、応答を生成しない`judgment-of-scars`の実行時点を`IMMEDIATE`へ訂正した。カード性能・ruleset値・採点は変更していない。全120件の試験、型検査、静的Webビルドが成功した。実ブラウザ・iPhone実機の手動確認は未実施である。次はP4-03「balance pass」へ進む。
+`tests/content/p4-02-simulation-metrics.test.mjs`を追加し、同一seed・matchId・方針の完全一致、最終ハッシュ形式、指標分母、0件率、閾値到達順を固定した。通常の直接ダメージを応答待ちとして解決しようとする既存カードテンプレートも同時に検出し、応答を生成しない`judgment-of-scars`の実行時点を`IMMEDIATE`へ訂正した。カード性能・ruleset値・採点は変更していない。全120件の試験、型検査、静的Webビルドが成功した。実ブラウザ・iPhone実機の手動確認は未実施である。P4-03 H2実験の自動門を通過した。正式v2化の前に、人間試遊と独立最終レビューを実施する。
+
+
+## 25. P4-03「balance pass」H2実験の完了記録
+
+P4-03では、V1を上書きしない実験profile `candidate.p4-03.h2`を追加した。変更は`attack.star-breaker.v1`のRELEASE世界損傷7→8だけで、プレイヤー損傷16、CPU方針、ruleset値、採点係数、他カードは維持している。1024固定seedで75到達は152件から224件へ+7.0313ポイント、最大ラウンド到達は9.0820%、先攻選定は51.63%となり、自動採用門を通過した。
+
+V1の配札・先攻・metrics・最終状態ハッシュはbaseline snapshotと再実行一致し、H2の機械可読snapshotと再実行も一致した。実験catalogは公開content indexと本番Web生成物から隔離し、候補profileでの責任8、75境界、採点-3倍、replay metadata拒否、最大ラウンド終端を直接試験した。全127件の試験、型検査、静的Webビルドが成功した。
+
+この完了記録は「自動門を通過し、人間試遊へ進める」ことを示す。正式な`ruleset.alpha-12.v2`や`attack.star-breaker.v2`への昇格は、人間試遊とSol・Highの独立最終レビューが終わるまで行わない。

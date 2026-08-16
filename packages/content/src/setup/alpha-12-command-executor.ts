@@ -10,7 +10,12 @@ import {
   type GameState,
   type ReplayCommandExecution,
 } from "../../../game-core/src/index.ts";
-import { INITIAL_12_CARD_BY_ID, buildInitial12CardEffects, initial12CommandValidationOptions } from "../cards/initial-12.ts";
+import {
+  INITIAL_12_CATALOG,
+  buildInitial12CardEffects,
+  type Initial12Catalog,
+  initial12CommandValidationOptions,
+} from "../cards/initial-12.ts";
 
 function moveResolvedCards(state: GameState, cardInstanceIds: readonly string[]): GameState {
   const ids = cardInstanceIds.filter((cardInstanceId, index) => cardInstanceIds.indexOf(cardInstanceId) === index);
@@ -45,7 +50,7 @@ function firstAttackDamage(effects: readonly { readonly commandType: string; rea
   return typeof amount === "number" ? amount : null;
 }
 
-function buildCardEffects(state: GameState, action: CardResolutionAction) {
+function buildCardEffects(state: GameState, action: CardResolutionAction, catalog: Initial12Catalog) {
   const attackEffects = buildInitial12CardEffects({
     resolutionId: action.pendingActionId,
     cardDefinitionId: action.cardDefinitionId,
@@ -56,7 +61,7 @@ function buildCardEffects(state: GameState, action: CardResolutionAction) {
     discardCardInstanceId: action.discardCardInstanceId ?? undefined,
     mode: action.playMode,
     turnSequence: state.turnSequence,
-  });
+  }, catalog);
   const responseEffects = action.responseCardInstanceId && action.responseMode === "RESPONSE"
     ? buildInitial12CardEffects({
         resolutionId: `${action.pendingActionId}.response`,
@@ -67,7 +72,7 @@ function buildCardEffects(state: GameState, action: CardResolutionAction) {
         pendingAttackId: state.pendingAttack?.pendingAttackId,
         mode: "RESPONSE",
         turnSequence: state.turnSequence,
-      })
+      }, catalog)
     : [];
   const responseModifiers = responseEffects.filter((effect) => (
     effect.commandType === "ADD_SHIELD"
@@ -78,10 +83,13 @@ function buildCardEffects(state: GameState, action: CardResolutionAction) {
   return [...responseModifiers, ...attackEffects, ...responseWorldEffects];
 }
 
-function resolveCardResolution(state: GameState): { readonly state: GameState; readonly events: readonly { readonly type: string }[] } {
+function resolveCardResolution(
+  state: GameState,
+  catalog: Initial12Catalog,
+): { readonly state: GameState; readonly events: readonly { readonly type: string }[] } {
   const action = state.pendingAction;
   if (!action || action.kind !== "CARD_RESOLUTION") return { state, events: [] };
-  const effects = buildCardEffects(state, action);
+  const effects = buildCardEffects(state, action, catalog);
   const result = resolveEffectQueue(state, effects);
   if (!result.committed) return { state: result.state, events: result.events };
   const cards = [action.cardInstanceId];
@@ -89,10 +97,10 @@ function resolveCardResolution(state: GameState): { readonly state: GameState; r
   return { state: moveResolvedCards(result.state, cards), events: result.events };
 }
 
-function openAttackResponse(state: GameState): GameState {
+function openAttackResponse(state: GameState, catalog: Initial12Catalog): GameState {
   const action = state.pendingAction;
   if (!action || action.kind !== "CARD_RESOLUTION") return state;
-  const definition = INITIAL_12_CARD_BY_ID[action.cardDefinitionId];
+  const definition = catalog.byId[action.cardDefinitionId];
   if (!definition || definition.role !== "ATTACK" || action.playMode !== "RELEASE" || !action.targetPlayerId) return state;
   const effects = buildInitial12CardEffects({
     resolutionId: action.pendingActionId,
@@ -102,7 +110,7 @@ function openAttackResponse(state: GameState): GameState {
     targetPlayerId: action.targetPlayerId,
     mode: action.playMode,
     turnSequence: state.turnSequence,
-  });
+  }, catalog);
   const baseDamage = firstAttackDamage(effects);
   if (baseDamage === null) return state;
   const pendingAttackId = `attack.${action.commandId}`;
@@ -129,6 +137,7 @@ export function executeAlpha12Command(
   state: GameState,
   command: Command,
   validationOptions: CommandValidationOptions = initial12CommandValidationOptions,
+  catalog: Initial12Catalog = INITIAL_12_CATALOG,
 ): ReplayCommandExecution {
   const result = applyCommand(state, command, validationOptions);
   if (!result.accepted || result.replayed) return result;
@@ -136,16 +145,16 @@ export function executeAlpha12Command(
   let nextState = result.state;
   let events: readonly { readonly type: string }[] = result.events;
   if (command.commandType === "PLAY_CARD" && nextState.pendingAction?.kind === "CARD_RESOLUTION") {
-    const definition = INITIAL_12_CARD_BY_ID[nextState.pendingAction.cardDefinitionId];
+    const definition = catalog.byId[nextState.pendingAction.cardDefinitionId];
     if (definition?.role === "ATTACK" && nextState.pendingAction.playMode === "RELEASE" && nextState.pendingAction.targetPlayerId) {
-      nextState = openAttackResponse(nextState);
+      nextState = openAttackResponse(nextState, catalog);
     } else {
-      const resolved = resolveCardResolution(nextState);
+      const resolved = resolveCardResolution(nextState, catalog);
       nextState = resolved.state;
       events = [...events, ...resolved.events];
     }
   } else if ((command.commandType === "SELECT_RESPONSE" || command.commandType === "ACCEPT_DAMAGE") && nextState.pendingAction?.kind === "CARD_RESOLUTION") {
-    const resolved = resolveCardResolution(nextState);
+    const resolved = resolveCardResolution(nextState, catalog);
     nextState = resolved.state;
     events = [...events, ...resolved.events];
   }

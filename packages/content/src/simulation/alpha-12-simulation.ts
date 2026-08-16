@@ -289,6 +289,11 @@ function runMatch(seed: string, matchIndex: number, options: Required<Pick<Alpha
     }
 
     if (state.phase === "TURN_START") {
+      if (state.roundNumber > state.ruleset.maxRounds) {
+        state = finalizeTerminalState(state);
+        observeThresholds(state, thresholdRounds);
+        continue;
+      }
       const resolved = resolveTurnStart(state);
       state = resolved;
       observeThresholds(state, thresholdRounds);

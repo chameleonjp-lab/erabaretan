@@ -5,7 +5,8 @@
   "scripts": {
     "test": "node --experimental-strip-types --test",
     "typecheck": "tsc --noEmit",
-    "build:web": "node scripts/build-web.mjs"
+    "build:web": "node scripts/build-web.mjs",
+    "build:h2-trial": "node scripts/build-p4-03-h2-trial.mjs"
   },
   "devDependencies": {
     "typescript": "^5.9.0"

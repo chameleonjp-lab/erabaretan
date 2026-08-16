@@ -230,6 +230,124 @@ export function buildInitial12CardEffects(input) {
         };
     });
 }
+function gameStateConditionContext(state) {
+    const players = {};
+    for (const playerId of state.initialPlayerOrder) {
+        const player = state.players[playerId];
+        if (!player)
+            continue;
+        players[playerId] = {
+            hitPoints: player.hitPoints,
+            hand: player.hand,
+            handSize: player.hand.length,
+            worldDamageResponsibility: player.worldDamageResponsibility,
+        };
+    }
+    return {
+        phase: state.phase,
+        players,
+        worldDurability: state.world.durability,
+        worldMaxDurability: state.world.maxDurability,
+        activeField: state.activeField,
+        respondingPlayerId: state.respondingPlayerId,
+        pendingActionDefenderId: state.pendingAction?.kind === "RESPONSE_SELECTION"
+            ? state.pendingAction.defendingPlayerId
+            : null,
+        pendingAttackDefenderId: state.pendingAttack?.defendingPlayerId ?? null,
+        pendingActionAttackId: state.pendingAction?.kind === "RESPONSE_SELECTION"
+            ? state.pendingAction.pendingAttackId
+            : null,
+        pendingAttackId: state.pendingAttack?.pendingAttackId ?? null,
+        inResolution: state.cardZones.inResolution,
+    };
+}
+function publicStateConditionContext(state) {
+    const players = {};
+    for (const player of state.players) {
+        players[player.playerId] = {
+            hitPoints: player.hp,
+            hand: player.hand.cards?.map((card) => card.cardInstanceId) ?? [],
+            handSize: player.hand.count,
+            worldDamageResponsibility: player.worldDamageResponsibility,
+        };
+    }
+    return {
+        phase: state.phase,
+        players,
+        worldDurability: state.world.durability,
+        worldMaxDurability: state.world.maxDurability,
+        activeField: state.activeField,
+        respondingPlayerId: state.respondingPlayerId,
+        pendingActionDefenderId: state.pendingInteraction?.kind === "RESPONSE_SELECTION"
+            ? state.pendingInteraction.defendingPlayerId
+            : null,
+        pendingAttackDefenderId: state.pendingInteraction?.kind === "RESPONSE_SELECTION"
+            ? state.pendingInteraction.defendingPlayerId
+            : null,
+        pendingActionAttackId: state.pendingInteraction?.kind === "RESPONSE_SELECTION"
+            ? state.pendingInteraction.pendingAttackId
+            : null,
+        pendingAttackId: state.pendingInteraction?.kind === "RESPONSE_SELECTION"
+            ? state.pendingInteraction.pendingAttackId
+            : null,
+        inResolution: state.inResolution.map((card) => card.cardInstanceId),
+    };
+}
+function validateInitial12CardConditions(input) {
+    const condition = input.definition.conditions[input.mode];
+    if (!condition)
+        return { ok: false, code: "CONDITION_NOT_MET", message: "card mode is not supported" };
+    if (input.context.phase !== condition.phase) {
+        return { ok: false, code: "INVALID_PHASE", message: `card mode requires ${condition.phase}` };
+    }
+    const self = input.context.players[input.playerId];
+    if (!self)
+        return { ok: false, code: "INVALID_CARD", message: "player is not in the public match state" };
+    if (condition.requiresOpponentTarget) {
+        if (!input.targetPlayerId || input.targetPlayerId === input.playerId || !input.context.players[input.targetPlayerId]) {
+            return { ok: false, code: "INVALID_TARGET", message: "an opponent target is required" };
+        }
+    }
+    if (condition.requiresPendingAttackDefender) {
+        if (input.context.phase !== "RESPONSE_SELECTION"
+            || input.context.pendingActionDefenderId !== input.playerId
+            || input.context.pendingAttackDefenderId !== input.playerId
+            || input.context.pendingActionDefenderId !== input.context.pendingAttackDefenderId
+            || input.context.respondingPlayerId !== input.playerId
+            || input.context.pendingActionAttackId === null
+            || input.context.pendingAttackId === null
+            || input.context.pendingActionAttackId !== input.context.pendingAttackId) {
+            return { ok: false, code: "CONDITION_NOT_MET", message: "the player is not the current pending-attack defender" };
+        }
+    }
+    if (condition.selfHitPointsAtLeast !== undefined && self.hitPoints < condition.selfHitPointsAtLeast) {
+        return { ok: false, code: "CONDITION_NOT_MET", message: "self hit points are below the card condition" };
+    }
+    if (condition.worldBelowMax && input.context.worldDurability >= input.context.worldMaxDurability) {
+        return { ok: false, code: "CONDITION_NOT_MET", message: "the world is already at maximum durability" };
+    }
+    if (condition.opponentWorldDamageResponsibilityAtLeast !== undefined) {
+        const target = input.targetPlayerId ? input.context.players[input.targetPlayerId] : undefined;
+        if (!target || target.worldDamageResponsibility < condition.opponentWorldDamageResponsibilityAtLeast) {
+            return { ok: false, code: "CONDITION_NOT_MET", message: "the opponent's world-damage responsibility is below the card condition" };
+        }
+    }
+    if (condition.activeFieldRequired && !input.context.activeField) {
+        return { ok: false, code: "CONDITION_NOT_MET", message: "an active field is required" };
+    }
+    if (condition.handSizeAtLeast !== undefined && self.handSize < condition.handSizeAtLeast) {
+        return { ok: false, code: "CONDITION_NOT_MET", message: "the hand is below the card condition" };
+    }
+    if (input.definition.cardDefinitionId === "intervention.careful-redraw.v1") {
+        if (!input.discardCardInstanceId
+            || input.discardCardInstanceId === input.cardInstanceId
+            || !self.hand.includes(input.discardCardInstanceId)
+            || input.context.inResolution.includes(input.discardCardInstanceId)) {
+            return { ok: false, code: "CONDITION_NOT_MET", message: "careful-redraw must discard another card from the player's hand" };
+        }
+    }
+    return { ok: true, definition: input.definition };
+}
 /**
  * Validates the alpha-12 catalog conditions without putting card-specific
  * knowledge into game-core. The command layer can call this after the generic
@@ -245,58 +363,38 @@ export function validateInitial12CardPlay(input) {
     const definition = INITIAL_12_CARD_BY_ID[card.cardDefinitionId];
     if (!definition)
         return { ok: false, code: "INVALID_CARD", message: "card definition is not in the alpha-12 catalog" };
-    const condition = definition.conditions[input.mode];
-    if (!condition)
-        return { ok: false, code: "CONDITION_NOT_MET", message: "card mode is not supported" };
-    if (input.state.phase !== condition.phase) {
-        return { ok: false, code: "INVALID_PHASE", message: `card mode requires ${condition.phase}` };
+    return validateInitial12CardConditions({
+        context: gameStateConditionContext(input.state),
+        definition,
+        playerId: input.playerId,
+        cardInstanceId: input.cardInstanceId,
+        mode: input.mode,
+        targetPlayerId: input.targetPlayerId,
+        discardCardInstanceId: input.discardCardInstanceId,
+    });
+}
+/** Validates the same catalog condition contract against a player-scoped view. */
+export function validateInitial12CardPlayFromPublicState(input) {
+    const ownPlayer = input.state.players.find((player) => player.playerId === input.playerId);
+    const publicCard = ownPlayer?.hand.cards?.find((card) => card.cardInstanceId === input.card.cardInstanceId);
+    if (!publicCard) {
+        return { ok: false, code: "CARD_NOT_IN_HAND", message: "card instance is not in the player's public hand" };
     }
-    const self = input.state.players[input.playerId];
-    if (condition.requiresOpponentTarget) {
-        if (!input.targetPlayerId || input.targetPlayerId === input.playerId || !input.state.players[input.targetPlayerId]) {
-            return { ok: false, code: "INVALID_TARGET", message: "an opponent target is required" };
-        }
+    if (publicCard.cardDefinitionId !== input.card.cardDefinitionId) {
+        return { ok: false, code: "INVALID_CARD", message: "public card definition does not match the player's hand" };
     }
-    if (condition.requiresPendingAttackDefender) {
-        const pending = input.state.pendingAction;
-        const pendingAttack = input.state.pendingAttack;
-        if (!pending
-            || pending.kind !== "RESPONSE_SELECTION"
-            || pending.defendingPlayerId !== input.playerId
-            || input.state.respondingPlayerId !== input.playerId
-            || !pendingAttack
-            || pending.pendingAttackId !== pendingAttack.pendingAttackId
-            || pending.defendingPlayerId !== pendingAttack.defendingPlayerId) {
-            return { ok: false, code: "CONDITION_NOT_MET", message: "the player is not the current pending-attack defender" };
-        }
-    }
-    if (condition.selfHitPointsAtLeast !== undefined && self.hitPoints < condition.selfHitPointsAtLeast) {
-        return { ok: false, code: "CONDITION_NOT_MET", message: "self hit points are below the card condition" };
-    }
-    if (condition.worldBelowMax && input.state.world.durability >= input.state.world.maxDurability) {
-        return { ok: false, code: "CONDITION_NOT_MET", message: "the world is already at maximum durability" };
-    }
-    if (condition.opponentWorldDamageResponsibilityAtLeast !== undefined) {
-        const target = input.targetPlayerId ? input.state.players[input.targetPlayerId] : undefined;
-        if (!target || target.worldDamageResponsibility < condition.opponentWorldDamageResponsibilityAtLeast) {
-            return { ok: false, code: "CONDITION_NOT_MET", message: "the opponent's world-damage responsibility is below the card condition" };
-        }
-    }
-    if (condition.activeFieldRequired && !input.state.activeField) {
-        return { ok: false, code: "CONDITION_NOT_MET", message: "an active field is required" };
-    }
-    if (condition.handSizeAtLeast !== undefined && self.hand.length < condition.handSizeAtLeast) {
-        return { ok: false, code: "CONDITION_NOT_MET", message: "the hand is below the card condition" };
-    }
-    if (definition.cardDefinitionId === "intervention.careful-redraw.v1") {
-        if (!input.discardCardInstanceId
-            || input.discardCardInstanceId === input.cardInstanceId
-            || !self.hand.includes(input.discardCardInstanceId)
-            || input.state.cardZones.inResolution.includes(input.discardCardInstanceId)) {
-            return { ok: false, code: "CONDITION_NOT_MET", message: "careful-redraw must discard another card from the player's hand" };
-        }
-    }
-    return { ok: true, definition };
+    const definition = INITIAL_12_CARD_BY_ID[publicCard.cardDefinitionId];
+    if (!definition)
+        return { ok: false, code: "INVALID_CARD", message: "card definition is not in the alpha-12 catalog" };
+    return validateInitial12CardConditions({
+        context: publicStateConditionContext(input.state),
+        definition,
+        playerId: input.playerId,
+        cardInstanceId: input.card.cardInstanceId,
+        mode: input.mode,
+        targetPlayerId: input.targetPlayerId,
+        discardCardInstanceId: input.discardCardInstanceId,
+    });
 }
 export const initial12CommandValidationOptions = {
     cardConditionValidator: (input) => {

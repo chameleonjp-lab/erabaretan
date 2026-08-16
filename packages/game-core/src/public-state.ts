@@ -99,6 +99,8 @@ export interface PublicGameState {
   readonly publicStateVersion: typeof PUBLIC_STATE_VERSION;
   readonly matchId: string;
   readonly rulesetId: string;
+  /** Public rule data required to decide whether an overflow discard is legal. */
+  readonly handLimit: number;
   readonly catalogHash: string;
   readonly engineVersion: string;
   readonly revision: number;
@@ -234,6 +236,7 @@ function project(state: GameState, viewer: StateViewer): PublicGameState {
     publicStateVersion: PUBLIC_STATE_VERSION,
     matchId: state.matchId,
     rulesetId: state.ruleset.rulesetId,
+    handLimit: state.ruleset.handLimit,
     catalogHash: state.catalogHash,
     engineVersion: state.engineVersion,
     revision: state.revision,

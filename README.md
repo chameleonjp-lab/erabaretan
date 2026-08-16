@@ -37,6 +37,7 @@
 - [battle hand / action UX V1](docs/29_BATTLE_HAND_ACTION_UX_V1.md)
 - [battle world preview / judgment hint V1](docs/30_BATTLE_WORLD_PREVIEW_JUDGMENT_HINT_V1.md)
 - [result judgment / summary V1](docs/31_RESULT_JUDGMENT_SUMMARY_V1.md)
+- [CPU合法手生成 V1](docs/32_CPU_LEGAL_ACTIONS_V1.md)
 
 ### レビュー
 
@@ -52,7 +53,7 @@
 
 ## 現在の段階
 
-P3-04の結果審定・転換点要約を実装し、自動検証を完了した段階です。実ブラウザ・iPhone実機の手動確認は未実施です。
+P4-01のCPU合法手生成まで実装し、自動検証を完了した段階です。実ブラウザ・iPhone実機の手動確認は未実施です。
 
 P0-01として、[初期12種類カード仕様 V1](docs/16_INITIAL_12_CARD_SPEC_V1.md)を作成しました。カードの最終バランスではなく、12種類で中心体験を検証するための正本です。
 
@@ -87,7 +88,7 @@ P1-05として、[game-core projection / preview / summary V1](docs/26_GAME_CORE
 - 同時死亡、世界0、最大ラウンド、降参、切断の扱い
 - 決定的な乱数、リプレイ、秘密情報、ルール版固定の方針
 
-P0-01、P0-02、P0-03、P0-04、P0-05、P0-06、P1-01、P1-02、P1-03、P1-04、P1-04b、P1-05、P2-01、P2-02、P2-03、P3-01、P3-02、P3-03、P3-04の実装は完了しました。P0-06の現行golden値、実行境界、manifest付属データを正本へ反映し、旧値は履歴として隔離しています。
+P0-01、P0-02、P0-03、P0-04、P0-05、P0-06、P1-01、P1-02、P1-03、P1-04、P1-04b、P1-05、P2-01、P2-02、P2-03、P3-01、P3-02、P3-03、P3-04、P4-01の実装は完了しました。P0-06の現行golden値、実行境界、manifest付属データを正本へ反映し、旧値は履歴として隔離しています。
 
 P1-04bまでの決定性とハッシュ境界を維持したまま、P1-05で公開状態投影・preview・結果summaryを追加し、P2-01でFixture A〜F、P2-02で敵対的Fixture X01〜X14、P2-03で不変条件・秘密情報試験を自動化しました。P3-01では同一端末のbattle shell、端末受け渡し、カード破棄、応答、結果表示、再戦を追加しました。P3-02ではカード説明、行動ごとの効果表示、世界損傷7の解放確認、使えない行動の無効化を追加しました。次は実ブラウザ・iPhone縦画面の確認後にP4-01へ進みます。
 
@@ -97,3 +98,6 @@ P2-02では、X01〜X14の境界再通過、複数境界、世界崩壊、同率
 
 
 P3-04として、[結果審定・転換点要約 V1](docs/31_RESULT_JUDGMENT_SUMMARY_V1.md)を追加しました。正式な`summarizeMatch`結果を使った終了理由・評価内訳・神の選定を表示し、公開可能なイベントから同一行動の重複を避けて最大3件の転換点を抽出します。手札、山札順、カードID、seed、command履歴は結果要約へ渡しません。P3-04専用試験を含め、全111件が成功しています。実ブラウザ・iPhone実機の手動確認は未実施です。
+
+
+P4-01として、[CPU合法手生成 V1](docs/32_CPU_LEGAL_ACTIONS_V1.md)を追加しました。本人向け`PublicGameState`から合法なカード行動、応答、手札超過整理、降参を決定的に列挙し、commandId・revisionの付与を分離しています。相手手札、山札順、seed、未使用乱数、command履歴はCPUの候補生成へ渡しません。P4-01専用試験を含め、全115件が成功しています。実ブラウザ・iPhone実機の手動確認は未実施です。次はP4-02「simulation metrics」です。

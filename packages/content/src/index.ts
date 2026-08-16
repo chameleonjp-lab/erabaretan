@@ -4,6 +4,7 @@ export {
   buildInitial12CardEffects,
   initial12CommandValidationOptions,
   validateInitial12CardPlay,
+  validateInitial12CardPlayFromPublicState,
 } from "./cards/initial-12.ts";
 
 export type {
@@ -13,6 +14,7 @@ export type {
   InitialCardCondition,
   InitialCardDefinition,
   ValidateInitial12CardPlayInput,
+  ValidateInitial12CardPublicPlayInput,
 } from "./cards/initial-12.ts";
 
 export {
@@ -28,3 +30,12 @@ export type { Alpha12SetupInput, Alpha12SetupResult } from "./setup/alpha-12.ts"
 
 export { executeAlpha12Command } from "./setup/alpha-12-command-executor.ts";
 export { previewAlpha12Command } from "./setup/alpha-12-preview.ts";
+
+export {
+  alpha12CpuCommandId,
+  enumerateAlpha12CpuActions,
+  generateAlpha12CpuLegalCommands,
+  materializeAlpha12CpuCommand,
+} from "./cpu/legal-actions.ts";
+
+export type { CpuActionIntent } from "./cpu/legal-actions.ts";

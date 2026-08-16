@@ -5,6 +5,7 @@ import {
   buildInitial12CardEffects,
   initial12CommandValidationOptions,
   validateInitial12CardPlay,
+  validateInitial12CardPlayFromPublicState,
 } from "../../packages/content/src/index.ts";
 import { ALPHA_12_RULESET, applyCommand, beginPendingAttack, createInitialGameState } from "../../packages/game-core/src/index.ts";
 
@@ -258,6 +259,30 @@ test("response card conditions require the live pending attack to match", () => 
   });
   assert.equal(mismatched.ok, false);
 
+  const mismatchedDefender = validateInitial12CardPlay({
+    state: {
+      ...withAttack,
+      phase: "RESPONSE_SELECTION",
+      respondingPlayerId: "P1",
+      pendingAction: {
+        kind: "RESPONSE_SELECTION",
+        pendingAttackId: "attack-content-01",
+        commandId: "command-content-01",
+        attackingPlayerId: "P2",
+        defendingPlayerId: "P1",
+        cardInstanceId: "card-01",
+        cardDefinitionId: "defense.guardian-veil.v1",
+        playMode: "RELEASE",
+        targetPlayerId: "P2",
+      },
+      pendingAttack: { ...withAttack.pendingAttack, defendingPlayerId: "P2" },
+    },
+    playerId: "P1",
+    cardInstanceId: "card-01",
+    mode: "RESPONSE",
+  });
+  assert.equal(mismatchedDefender.ok, false);
+
   const matching = validateInitial12CardPlay({
     state: {
       ...withAttack,
@@ -280,6 +305,70 @@ test("response card conditions require the live pending attack to match", () => 
     mode: "RESPONSE",
   });
   assert.equal(matching.ok, true);
+});
+
+test("public card condition validation rejects a mismatched card definition reference", () => {
+  const state = conditionState({
+    cardDefinitionId: "intervention.careful-redraw.v1",
+    hand: ["card-01", "other-card-01"],
+    extraCards: [{ cardInstanceId: "other-card-01", cardDefinitionId: "attack.rift-pebble.v1", ownerPlayerId: "P1", zone: "HAND", drawOrder: 3 }],
+  });
+  const projected = {
+    publicStateVersion: "public-state.alpha-12.v1",
+    matchId: state.matchId,
+    rulesetId: state.ruleset.rulesetId,
+    handLimit: state.ruleset.handLimit,
+    catalogHash: state.catalogHash,
+    engineVersion: state.engineVersion,
+    revision: state.revision,
+    phase: state.phase,
+    roundNumber: state.roundNumber,
+    turnSequence: state.turnSequence,
+    initialPlayerOrder: state.initialPlayerOrder,
+    activePlayerId: state.activePlayerId,
+    respondingPlayerId: state.respondingPlayerId,
+    players: state.initialPlayerOrder.map((playerId) => ({
+      playerId,
+      hp: state.players[playerId].hitPoints,
+      maxHp: state.players[playerId].maxHitPoints,
+      hand: {
+        count: state.players[playerId].hand.length,
+        cards: state.players[playerId].hand.map((cardInstanceId) => ({
+          cardInstanceId,
+          cardDefinitionId: state.cardInstances[cardInstanceId].cardDefinitionId,
+        })),
+      },
+      worldDamageResponsibility: state.players[playerId].worldDamageResponsibility,
+      effectiveWorldRestore: state.players[playerId].effectiveWorldRestore,
+      survivedRoundCount: state.players[playerId].survivedRoundCount,
+      statusEffects: { nextDefensePenalty: 0, fragileWorld: false, shields: [], statModifiers: [] },
+    })),
+    drawPileCount: state.cardZones.drawPile.length,
+    discardPile: [],
+    revealedCards: [],
+    inResolution: [],
+    world: { ...state.world, collapseResponsiblePlayerId: null },
+    activeField: null,
+    pendingInteraction: null,
+    terminalFlags: {
+      worldCollapsed: false,
+      defeatedPlayerIds: [],
+      maxRoundsReached: false,
+      endKind: null,
+      battleWinnerId: null,
+      divineSelectionWinnerId: null,
+    },
+  };
+  const realCard = projected.players[0].hand.cards[0];
+  const fakeCard = { ...realCard, cardDefinitionId: "attack.star-breaker.v1" };
+  const result = validateInitial12CardPlayFromPublicState({
+    state: projected,
+    playerId: "P1",
+    card: fakeCard,
+    mode: "RESTRAIN",
+  });
+  assert.equal(result.ok, false);
+  assert.equal(result.code, "INVALID_CARD");
 });
 
 test("initial-12 condition adapter can be applied to generic command validation", () => {

@@ -319,7 +319,7 @@ function turningPointText(point) {
         return `${point.playerIds.map(playerLabel).join("・") || "プレイヤー"}の体力が0になりました。`;
     if (point.kind === "WORLD_COLLAPSED") {
         const damageText = point.amount ? `${firstPlayer}の世界への${point.amount}損傷を契機に、` : "";
-        const defeatedText = point.playerIds.length > 1 ? ` ${playerLabel(point.playerIds[point.playerIds.length - 1])}の体力も0になり、` : "";
+        const defeatedText = point.amount && point.playerIds.length > 1 ? ` ${playerLabel(point.playerIds[point.playerIds.length - 1])}の体力も0になり、` : "";
         return `${damageText}${defeatedText}世界耐久が0となり、世界が崩壊しました。`;
     }
     if (point.kind === "MAX_ROUNDS_REACHED")
@@ -331,6 +331,21 @@ function renderTurningPoints(points) {
         return `<section class="turning-points"><h2>試合を変えた転換点</h2><p>大きな公開転換点は記録されませんでした。</p></section>`;
     }
     return `<section class="turning-points"><h2>試合を変えた転換点</h2><ol class="turning-point-list">${points.map((point) => `<li class="turning-point">${escapeHtml(turningPointText(point))}</li>`).join("")}</ol></section>`;
+}
+function selectionReasonText(summary) {
+    if (summary.endKind !== "NORMAL")
+        return "非通常終了のため、神の審定は行われませんでした。";
+    if (summary.divineSelection.status === "TIE") {
+        return `合計点が同点のため、神の選定は同率です。`;
+    }
+    const winnerId = summary.divineSelection.winnerId;
+    if (!winnerId)
+        return "神の選定者はありません。";
+    const winner = summary.players.find((player) => player.playerId === winnerId);
+    const other = summary.players.find((player) => player.playerId !== winnerId);
+    if (!winner || !other || winner.score === null || other.score === null)
+        return `${playerLabel(winnerId)}を選定しました。`;
+    return `${playerLabel(winnerId)}を選定。合計${winner.score}点が${playerLabel(other.playerId)}の${other.score}点を上回りました。`;
 }
 function renderResult() {
     if (!shell.state)
@@ -344,11 +359,12 @@ function renderResult() {
     const divineWinner = summary.divineSelection.winnerId ? playerLabel(summary.divineSelection.winnerId) : "選定なし";
     return `<main class="screen result-screen">
     <header class="result-hero"><span class="eyebrow">試合終了</span><h1>神の審定</h1><p>戦闘の勝者と、世界への責任を分けて確認します。</p></header>
-    <section class="result-cards"><article><span class="eyebrow">戦闘勝者</span><strong>${escapeHtml(battleWinner)}</strong></article><article><span class="eyebrow">神の選定者</span><strong>${escapeHtml(divineWinner)}</strong></article></section>
+    <p class="result-reason">${escapeHtml(endReasonText(summary))}</p>
+    <section class="result-cards"><article><span class="eyebrow">戦闘勝者</span><strong>${escapeHtml(battleWinner)}</strong></article></section>
     <section class="score-table"><h2>評価の内訳</h2>${summary.players.map((player) => `<div class="score-row"><span>${escapeHtml(playerLabel(player.playerId))}</span><strong>${escapeHtml(scoreText(player.score))}</strong><small>生存評価 ${escapeHtml(scoreText(player.survivalEvaluation))} / 世界評価 ${escapeHtml(scoreText(player.worldEvaluation))}</small><small>世界損傷 ${player.worldDamageResponsibility} / 世界再生 ${player.effectiveWorldRestore}${player.causedWorldCollapse ? " / 破界責任あり" : ""}</small></div>`).join("")}</section>
     <p class="result-explanation">${escapeHtml(summary.endKind === "NORMAL" ? "神の選定は、生存・世界損傷・世界再生・破界責任を合わせた正式評価です。" : "非通常終了のため、神の審定は行われませんでした。")}</p>
     ${renderTurningPoints(resultJudgment.turningPoints)}
-    <p class="result-reason">${escapeHtml(endReasonText(summary))}</p>
+    <section class="result-cards result-selection"><article><span class="eyebrow">神の選定者</span><strong>${escapeHtml(divineWinner)}</strong><p class="selection-reason">${escapeHtml(selectionReasonText(summary))}</p></article></section>
     <button class="primary-button wide" data-rematch>もう一度遊ぶ</button>
   </main>`;
 }

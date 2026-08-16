@@ -30,7 +30,8 @@ h2 { margin-bottom: 0; font-size: 1.1rem; }
 h3 { margin-bottom: 6px; font-size: 1rem; }
 p { color: var(--muted); line-height: 1.7; }
 
-.title-screen, .law-screen, .result-screen, .error-screen { display: flex; flex-direction: column; justify-content: center; }
+.title-screen, .law-screen, .error-screen { display: flex; flex-direction: column; justify-content: center; }
+.result-screen { display: flex; flex-direction: column; justify-content: start; }
 .handoff-screen { display: flex; flex-direction: column; justify-content: center; }
 .handoff-screen h1 { max-width: 18ch; color: var(--accent-strong); }
 .handoff-card { display: grid; gap: 8px; margin: 26px 0; padding: 20px; border: 1px solid rgba(231, 182, 107, 0.35); border-radius: 18px; background: var(--panel); }
@@ -60,7 +61,7 @@ p { color: var(--muted); line-height: 1.7; }
 .phase-chip, .turn-badge { display: inline-flex; align-items: center; white-space: nowrap; border: 1px solid rgba(231, 182, 107, 0.35); border-radius: 999px; padding: 6px 10px; color: var(--accent-strong); background: rgba(231, 182, 107, 0.12); font-size: 0.78rem; }
 .turn-badge { margin-left: 7px; padding: 3px 7px; font-size: 0.68rem; }
 
-.world-panel, .player-panel, .decision-panel, .hand-card, .score-table { border: 1px solid var(--line); border-radius: 18px; background: var(--panel); box-shadow: 0 16px 48px rgba(0, 0, 0, 0.16); }
+.world-panel, .player-panel, .decision-panel, .hand-card, .score-table, .turning-points { border: 1px solid var(--line); border-radius: 18px; background: var(--panel); box-shadow: 0 16px 48px rgba(0, 0, 0, 0.16); }
 .world-panel { padding: 17px; }
 .world-heading, .section-heading, .card-topline, .player-name, .hp-line, .mini-stats, .thresholds, .score-row { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
 .world-heading h2 { margin-top: 4px; }
@@ -129,6 +130,11 @@ progress { display: block; width: 100%; height: 13px; margin: 16px 0 12px; accen
 .score-row { flex-wrap: wrap; justify-content: start; padding: 12px 0; border-top: 1px solid var(--line); }
 .score-row strong { margin-left: auto; color: var(--accent-strong); }
 .score-row small { flex-basis: 100%; color: var(--muted); font-size: 0.72rem; }
+.result-explanation { margin: 17px 0 12px; padding: 0 4px; font-size: 0.8rem; }
+.turning-points { margin-top: 4px; padding: 16px; }
+.turning-points h2 { margin-bottom: 12px; }
+.turning-point-list { display: grid; gap: 9px; margin: 0; padding-left: 24px; }
+.turning-point { padding-left: 4px; color: var(--ink); font-size: 0.82rem; line-height: 1.55; }
 .result-reason { margin: 17px 0; text-align: center; font-size: 0.82rem; }
 .error-screen { text-align: center; }
 

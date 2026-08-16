@@ -2,6 +2,7 @@ import { INITIAL_12_CARD_BY_ID, previewAlpha12Command, } from "../../packages/co
 import { projectPublicState, summarizeMatch, } from "../../packages/game-core/src/index.js";
 import { battlePrompt, actionDescription, cardDescription, effectHint, handoffTargetForStateChange, judgmentHint, modeLabel, phaseLabel, playerLabel, previewJudgmentHint, roleLabel, requiresActionConfirmation, screenForPhase, viewerForGameState, worldPreview, } from "./battle-shell.js";
 import { applyLocalCommand, createLocalMatch } from "./local-match.js";
+import { collectPublicFactBatch, composeResultJudgment, } from "./result-summary.js";
 const appElement = document.querySelector("#app");
 if (!appElement)
     throw new Error("#app is required");
@@ -15,6 +16,7 @@ const shell = {
     notice: "",
     rematchNumber: 0,
     commandNumber: 0,
+    factBatches: [],
 };
 function escapeHtml(value) {
     return String(value ?? "")
@@ -60,6 +62,9 @@ function sendCommand(command) {
         return;
     }
     shell.state = result.state;
+    if (!result.replayed) {
+        shell.factBatches = [...shell.factBatches, collectPublicFactBatch(result.events, PLAYER_IDS)];
+    }
     shell.pendingAction = null;
     shell.handoffFor = handoffTargetForStateChange(previousState, result.state);
     shell.notice = result.events.length > 0 ? "処理しました。" : "";
@@ -83,6 +88,7 @@ function startBattle() {
     shell.pendingAction = null;
     shell.handoffFor = handoffTargetForStateChange(null, nextState);
     shell.notice = "同じ端末で交互に操作します。";
+    shell.factBatches = [];
     shell.screen = "BATTLE";
     render();
 }
@@ -269,7 +275,7 @@ function renderBattle() {
     const ownPlayer = publicState.players.find((player) => player.playerId === viewerId);
     const hand = ownPlayer?.hand.cards ?? [];
     return `<main class="screen battle-screen">
-    <header class="topbar"><div><span class="eyebrow">エラバレタン / P3-03</span><h1>砕けゆく原初界</h1></div><span class="phase-chip">${escapeHtml(phaseLabel(publicState.phase))}</span></header>
+    <header class="topbar"><div><span class="eyebrow">エラバレタン / P3-04</span><h1>砕けゆく原初界</h1></div><span class="phase-chip">${escapeHtml(phaseLabel(publicState.phase))}</span></header>
     ${renderWorld(publicState)}
     ${renderPlayers(shell.state, publicState)}
     <section class="decision-area">${renderBattleControls(shell.state, publicState, viewerId)}</section>
@@ -280,6 +286,52 @@ function renderBattle() {
 function renderHandoff(playerId) {
     return `<main class="screen handoff-screen"><span class="eyebrow">同じ端末で交互に操作</span><h1>端末を${escapeHtml(playerLabel(playerId))}へ渡してください</h1><p>前のプレイヤーに手札を見せないように、端末を渡してから確認してください。</p><div class="handoff-card"><strong>次の操作担当</strong><span>${escapeHtml(playerLabel(playerId))}</span></div><button class="primary-button wide" data-handoff-ready>確認して手札を見る</button></main>`;
 }
+function endReasonText(summary) {
+    if (summary.endKind === "SURRENDER") {
+        const surrendering = summary.players.find((player) => player.playerId !== summary.battle.winnerId);
+        return surrendering ? `${playerLabel(surrendering.playerId)}の降参で戦闘が終了しました。` : "降参で戦闘が終了しました。";
+    }
+    if (summary.endKind !== "NORMAL")
+        return `終了種別：${summary.endKind}`;
+    const reasons = summary.normalEndReasons;
+    const defeated = summary.players.filter((player) => player.survivalEvaluation !== null && player.score !== null && player.playerId !== summary.battle.winnerId);
+    const reasonText = reasons.map((reason) => {
+        if (reason === "PLAYER_DEFEATED")
+            return defeated.length === 1 ? `${playerLabel(defeated[0].playerId)}の体力が0` : "両者の体力が0";
+        if (reason === "WORLD_COLLAPSED")
+            return "世界耐久が0となり世界崩壊";
+        return "最大ラウンドを終えた";
+    });
+    return `${reasonText.join("、")}で戦闘が終了しました。`;
+}
+function scoreText(value) {
+    return value === null ? "—" : `${value}点`;
+}
+function turningPointText(point) {
+    const firstPlayer = point.playerIds[0] ? playerLabel(point.playerIds[0]) : "誰か";
+    if (point.kind === "WORLD_DAMAGE")
+        return `${firstPlayer}が世界へ${point.amount ?? 0}損傷を与えました。`;
+    if (point.kind === "WORLD_RESTORE")
+        return `${firstPlayer}が世界を${point.amount ?? 0}回復しました。`;
+    if (point.kind === "WORLD_THRESHOLD")
+        return `世界が${point.thresholds.join("・")}境界を通過しました。`;
+    if (point.kind === "PLAYER_DEFEATED")
+        return `${point.playerIds.map(playerLabel).join("・") || "プレイヤー"}の体力が0になりました。`;
+    if (point.kind === "WORLD_COLLAPSED") {
+        const damageText = point.amount ? `${firstPlayer}の世界への${point.amount}損傷を契機に、` : "";
+        const defeatedText = point.playerIds.length > 1 ? ` ${playerLabel(point.playerIds[point.playerIds.length - 1])}の体力も0になり、` : "";
+        return `${damageText}${defeatedText}世界耐久が0となり、世界が崩壊しました。`;
+    }
+    if (point.kind === "MAX_ROUNDS_REACHED")
+        return "最大ラウンドに到達し、決着なしで戦闘が終了しました。";
+    return `${firstPlayer}の降参で戦闘が終了しました。`;
+}
+function renderTurningPoints(points) {
+    if (points.length === 0) {
+        return `<section class="turning-points"><h2>試合を変えた転換点</h2><p>大きな公開転換点は記録されませんでした。</p></section>`;
+    }
+    return `<section class="turning-points"><h2>試合を変えた転換点</h2><ol class="turning-point-list">${points.map((point) => `<li class="turning-point">${escapeHtml(turningPointText(point))}</li>`).join("")}</ol></section>`;
+}
 function renderResult() {
     if (!shell.state)
         return "";
@@ -287,18 +339,21 @@ function renderResult() {
     if (!result.ok)
         return renderError(`結果を表示できません：${result.code}`);
     const summary = result.summary;
+    const resultJudgment = composeResultJudgment(summary, shell.factBatches);
     const battleWinner = summary.battle.winnerId ? playerLabel(summary.battle.winnerId) : "引き分け";
     const divineWinner = summary.divineSelection.winnerId ? playerLabel(summary.divineSelection.winnerId) : "選定なし";
     return `<main class="screen result-screen">
     <header class="result-hero"><span class="eyebrow">試合終了</span><h1>神の審定</h1><p>戦闘の勝者と、世界への責任を分けて確認します。</p></header>
     <section class="result-cards"><article><span class="eyebrow">戦闘勝者</span><strong>${escapeHtml(battleWinner)}</strong></article><article><span class="eyebrow">神の選定者</span><strong>${escapeHtml(divineWinner)}</strong></article></section>
-    <section class="score-table"><h2>評価</h2>${summary.players.map((player) => `<div class="score-row"><span>${escapeHtml(playerLabel(player.playerId))}</span><strong>${player.score === null ? "—" : player.score + "点"}</strong><small>世界損傷 ${player.worldDamageResponsibility} / 世界再生 ${player.effectiveWorldRestore}</small></div>`).join("")}</section>
-    <p class="result-reason">終了理由：${escapeHtml(summary.endKind === "SURRENDER" ? "降参" : summary.endKind === "NORMAL" ? "通常終了" : summary.endKind)}</p>
+    <section class="score-table"><h2>評価の内訳</h2>${summary.players.map((player) => `<div class="score-row"><span>${escapeHtml(playerLabel(player.playerId))}</span><strong>${escapeHtml(scoreText(player.score))}</strong><small>生存評価 ${escapeHtml(scoreText(player.survivalEvaluation))} / 世界評価 ${escapeHtml(scoreText(player.worldEvaluation))}</small><small>世界損傷 ${player.worldDamageResponsibility} / 世界再生 ${player.effectiveWorldRestore}${player.causedWorldCollapse ? " / 破界責任あり" : ""}</small></div>`).join("")}</section>
+    <p class="result-explanation">${escapeHtml(summary.endKind === "NORMAL" ? "神の選定は、生存・世界損傷・世界再生・破界責任を合わせた正式評価です。" : "非通常終了のため、神の審定は行われませんでした。")}</p>
+    ${renderTurningPoints(resultJudgment.turningPoints)}
+    <p class="result-reason">${escapeHtml(endReasonText(summary))}</p>
     <button class="primary-button wide" data-rematch>もう一度遊ぶ</button>
   </main>`;
 }
 function renderTitle() {
-    return `<main class="screen title-screen"><div class="title-mark"><span class="eyebrow">短時間対戦カードゲーム</span><h1>エラバレタン</h1><p>相手を倒すか、世界を守るか。最後に神が戦い方を査定します。</p></div><div class="title-actions"><button class="primary-button wide" data-world-law>世界律を確認する</button><p class="small-note">P3-03 世界予測・審定ヒント / 2人で交互に操作</p></div></main>`;
+    return `<main class="screen title-screen"><div class="title-mark"><span class="eyebrow">短時間対戦カードゲーム</span><h1>エラバレタン</h1><p>相手を倒すか、世界を守るか。最後に神が戦い方を査定します。</p></div><div class="title-actions"><button class="primary-button wide" data-world-law>世界律を確認する</button><p class="small-note">P3-04 結果要約・転換点 / 2人で交互に操作</p></div></main>`;
 }
 function renderWorldLaw() {
     return `<main class="screen law-screen"><span class="eyebrow">世界律確認</span><h1>砕けゆく原初界</h1><p class="lead">強いカードは相手だけでなく、共有世界にも影響します。世界を壊しすぎると、戦闘に勝っても神の評価を落とします。</p><div class="law-rules"><div><strong>75</strong><span>世界が傷つき、守りにくくなる</span></div><div><strong>50</strong><span>世界を戻した者が評価される</span></div><div><strong>25</strong><span>世界が脆くなり、危険が増える</span></div></div><p class="small-note">まずは解放と抑制を使い分け、相手と世界の両方を見てください。</p><button class="primary-button wide" data-start-battle>戦闘を開始する</button></main>`;

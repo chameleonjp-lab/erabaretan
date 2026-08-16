@@ -103,4 +103,4 @@ P3-04として、[結果審定・転換点要約 V1](docs/31_RESULT_JUDGMENT_SUM
 
 P4-01として、[CPU合法手生成 V1](docs/32_CPU_LEGAL_ACTIONS_V1.md)を追加しました。本人向け`PublicGameState`から合法なカード行動、応答、手札超過整理、降参を決定的に列挙し、commandId・revisionの付与を分離しています。相手手札、山札順、seed、未使用乱数、command履歴はCPUの候補生成へ渡しません。P4-01専用試験を含め、全115件が成功しています。実ブラウザ・iPhone実機の手動確認は未実施です。次はP4-02「simulation metrics」です。
 
-P4-02として、[シミュレーション指標 V1](docs/33_SIMULATION_METRICS_V1.md)を追加しました。固定seedのCPU対CPU試合、公開情報だけの`public-greedy-v1`方針、終端状態ハッシュ、ラウンド・世界境界・カード使用・先攻選定・戦闘と選定の一致・誓約・`DISCARD_FOR_ACTION`の集計を記録します。全119件の試験、型検査、静的Webビルドが成功しています。実ブラウザ・iPhone実機の手動確認は未実施です。次はP4-03「balance pass」です。
+P4-02として、[シミュレーション指標 V1](docs/33_SIMULATION_METRICS_V1.md)を追加しました。固定seedのCPU対CPU試合、公開情報だけの`public-greedy-v1`方針、終端状態ハッシュ、ラウンド・世界境界・カード使用・先攻選定・戦闘と選定の一致・誓約・`DISCARD_FOR_ACTION`の集計を記録します。全120件の試験、型検査、静的Webビルドが成功しています。実ブラウザ・iPhone実機の手動確認は未実施です。次はP4-03「balance pass」です。

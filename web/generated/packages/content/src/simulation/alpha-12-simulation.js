@@ -1,4 +1,4 @@
-import { ALPHA_12_RULESET, hashGameState, projectPublicState, resolveTurnStart, summarizeMatch, } from "../../../game-core/src/index.js";
+import { ALPHA_12_RULESET, advanceToNextTurnStart, finalizeTerminalState, hashGameState, projectPublicState, resolveTurnStart, summarizeMatch, } from "../../../game-core/src/index.js";
 import { INITIAL_12_CARD_BY_ID, INITIAL_12_CARD_DEFINITIONS } from "../cards/initial-12.js";
 import { alpha12CpuCommandId, enumerateAlpha12CpuActions, materializeAlpha12CpuCommand, } from "../cpu/legal-actions.js";
 import { createAlpha12Setup } from "../setup/alpha-12.js";
@@ -83,7 +83,7 @@ function scorePublicAction(view, action) {
     if (action.commandType === "DISCARD_OVERFLOW")
         return 1;
     if (action.commandType === "DISCARD_FOR_ACTION")
-        return view.world.durability <= 25 ? 16 : 4;
+        return view.world.durability <= 75 ? 35 : 4;
     const cardDefinitionId = actionCardDefinitionId(view, action);
     const definition = cardDefinitionId ? INITIAL_12_CARD_BY_ID[cardDefinitionId] : undefined;
     if (!definition)
@@ -163,6 +163,12 @@ function runMatch(seed, matchIndex, options) {
             observeThresholds(state, thresholdRounds);
             if (state.phase !== "TURN_START")
                 continue;
+        }
+        if (state.phase === "TURN_END") {
+            const terminal = finalizeTerminalState(state);
+            state = terminal.phase === "FINISHED" ? terminal : advanceToNextTurnStart(terminal);
+            observeThresholds(state, thresholdRounds);
+            continue;
         }
         const before = state;
         const command = commandForPublicGreedyAction(state);

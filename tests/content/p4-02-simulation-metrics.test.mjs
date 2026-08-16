@@ -90,3 +90,17 @@ test("P4-02 reports threshold reach in first-crossing round order", () => {
     if (threshold25 !== null) assert.ok(threshold50 !== null && threshold50 <= threshold25);
   }
 });
+
+test("P4-02 advances DISCARD_FOR_ACTION through TURN_END at the max-round boundary", () => {
+  const report = runAlpha12Simulation({
+    seeds: ["00000000000000000000000000000022"],
+    matchIdPrefix: "p4-02-discard-turn-end",
+  });
+  const [match] = report.matches;
+  assert.ok(match.discardForActionCount > 0);
+  assert.equal(match.endKind, "NORMAL");
+  assert.equal(match.maxRoundsReached, true);
+  assert.equal(match.rounds, 10);
+  assert.equal(match.finalRoundNumber, 11);
+  assert.equal(match.actionDecisionCount, match.playedCardCount + match.discardForActionCount);
+});

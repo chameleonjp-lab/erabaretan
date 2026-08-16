@@ -1,6 +1,8 @@
 import type { Command } from "../../../game-core/src/commands/types.ts";
 import {
   ALPHA_12_RULESET,
+  advanceToNextTurnStart,
+  finalizeTerminalState,
   hashGameState,
   projectPublicState,
   resolveTurnStart,
@@ -213,7 +215,7 @@ function scorePublicAction(view: PublicGameState, action: CpuActionIntent): numb
   if (action.commandType === "SURRENDER") return -10000;
   if (action.commandType === "ACCEPT_DAMAGE") return 0;
   if (action.commandType === "DISCARD_OVERFLOW") return 1;
-  if (action.commandType === "DISCARD_FOR_ACTION") return view.world.durability <= 25 ? 16 : 4;
+  if (action.commandType === "DISCARD_FOR_ACTION") return view.world.durability <= 75 ? 35 : 4;
 
   const cardDefinitionId = actionCardDefinitionId(view, action);
   const definition = cardDefinitionId ? INITIAL_12_CARD_BY_ID[cardDefinitionId] : undefined;
@@ -291,6 +293,13 @@ function runMatch(seed: string, matchIndex: number, options: Required<Pick<Alpha
       state = resolved;
       observeThresholds(state, thresholdRounds);
       if (state.phase !== "TURN_START") continue;
+    }
+
+    if (state.phase === "TURN_END") {
+      const terminal = finalizeTerminalState(state);
+      state = terminal.phase === "FINISHED" ? terminal : advanceToNextTurnStart(terminal);
+      observeThresholds(state, thresholdRounds);
+      continue;
     }
 
     const before = state;

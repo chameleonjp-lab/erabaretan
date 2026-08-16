@@ -65,6 +65,7 @@ authoritative GameState
 
 - `TURN_START`では`resolveTurnStart`を呼ぶ
 - 手札超過中は`DISCARD_OVERFLOW`を候補から選ぶ
+- `TURN_END`では`finalizeTerminalState`を先に確認し、未終端なら`advanceToNextTurnStart`で次の手番へ進める
 - `ACTION_SELECTION`ではactive playerの本人向け公開状態を使う
 - `RESPONSE_SELECTION`ではresponding playerの本人向け公開状態を使う
 - カード解決後にexecutorが次の`TURN_START`へ進めた場合、シミュレーション側で二重に進めない

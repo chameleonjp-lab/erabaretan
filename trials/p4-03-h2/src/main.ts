@@ -53,6 +53,7 @@ interface ShellState {
   pendingAction: PendingActionConfirmation | null;
   notice: string;
   rematchNumber: number;
+  firstPlayerId: PlayerId | null;
   commandNumber: number;
   factBatches: readonly PublicFactBatch[];
 }
@@ -72,6 +73,7 @@ const shell: ShellState = {
   pendingAction: null,
   notice: "",
   rematchNumber: 0,
+  firstPlayerId: null,
   commandNumber: 0,
   factBatches: [],
 };
@@ -90,8 +92,12 @@ function renderTrialIdentity(): string {
   return `<div class="trial-identity"><span class="trial-badge">H2試遊版</span><strong>${escapeHtml(H2_TRIAL_CANDIDATE_ID)}</strong><small>ビルド元SHA：${escapeHtml(H2_TRIAL_SOURCE_SHA)}</small></div>`;
 }
 
+function trialFirstPlayerId(state: GameState): PlayerId {
+  return shell.firstPlayerId ?? state.activePlayerId ?? PLAYER_IDS[0];
+}
+
 function renderTrialMatchMeta(state: GameState): string {
-  return `<div class="trial-match-meta"><span>試遊 ${shell.rematchNumber} / ${H2_TRIAL_GAME_COUNT}試合</span><span>seed <code>${escapeHtml(trialSeedForMatch(shell.rematchNumber))}</code></span><span>先攻：${escapeHtml(playerLabel(state.firstPlayerId))}</span></div>`;
+  return `<div class="trial-match-meta"><span>試遊 ${shell.rematchNumber} / ${H2_TRIAL_GAME_COUNT}試合</span><span>seed <code>${escapeHtml(trialSeedForMatch(shell.rematchNumber))}</code></span><span>先攻：${escapeHtml(playerLabel(trialFirstPlayerId(state)))}</span></div>`;
 }
 
 function opponentOf(playerId: PlayerId): PlayerId {
@@ -160,6 +166,9 @@ function actionCommand(
 function startBattle(): void {
   shell.rematchNumber += 1;
   const nextState = createLocalMatch(shell.rematchNumber);
+  const firstPlayerId = nextState.activePlayerId;
+  if (!firstPlayerId) throw new Error("first player is required");
+  shell.firstPlayerId = firstPlayerId;
   shell.state = nextState;
   shell.pendingAction = null;
   shell.handoffFor = handoffTargetForStateChange(null, nextState);
@@ -429,7 +438,7 @@ function renderTrialRecord(summary: MatchSummary): string {
     "75境界の直前で、試合が長く停滞しませんでしたか？",
     "神の選定者を、結果が出る前にある程度予想できましたか？",
   ];
-  return `<section class="trial-record"><span class="eyebrow">人間試遊の記録</span><h2>試合 ${shell.rematchNumber} の記録</h2><p class="trial-record-meta">候補：${escapeHtml(H2_TRIAL_CANDIDATE_ID)} / seed：<code>${escapeHtml(trialSeedForMatch(shell.rematchNumber))}</code> / 先攻：${escapeHtml(playerLabel(state.firstPlayerId))} / 終了：${escapeHtml(summary.endKind)} / ラウンド：${state.roundNumber} / 75境界：${state.world.triggeredThresholds.includes(75) ? "到達" : "未到達"}</p><div class="trial-questions">${questions.map((question, index) => `<label><span>${index + 1}. ${escapeHtml(question)}</span><textarea data-trial-answer="${index}" rows="2" placeholder="短く記録"></textarea></label>`).join("")}</div><button class="secondary-button wide" data-copy-trial-record>この試合の記録をコピー</button><p class="trial-record-notice" data-trial-record-notice role="status"></p><p class="small-note">記録はこの画面内だけに置かれ、どこにも送信されません。</p></section>`;
+  return `<section class="trial-record"><span class="eyebrow">人間試遊の記録</span><h2>試合 ${shell.rematchNumber} の記録</h2><p class="trial-record-meta">候補：${escapeHtml(H2_TRIAL_CANDIDATE_ID)} / seed：<code>${escapeHtml(trialSeedForMatch(shell.rematchNumber))}</code> / 先攻：${escapeHtml(playerLabel(trialFirstPlayerId(state)))} / 終了：${escapeHtml(summary.endKind)} / ラウンド：${state.roundNumber} / 75境界：${state.world.triggeredThresholds.includes(75) ? "到達" : "未到達"}</p><div class="trial-questions">${questions.map((question, index) => `<label><span>${index + 1}. ${escapeHtml(question)}</span><textarea data-trial-answer="${index}" rows="2" placeholder="短く記録"></textarea></label>`).join("")}</div><button class="secondary-button wide" data-copy-trial-record>この試合の記録をコピー</button><p class="trial-record-notice" data-trial-record-notice role="status"></p><p class="small-note">記録はこの画面内だけに置かれ、どこにも送信されません。</p></section>`;
 }
 
 async function copyTrialRecord(): Promise<void> {
@@ -448,7 +457,7 @@ async function copyTrialRecord(): Promise<void> {
     `sourceSha=${H2_TRIAL_SOURCE_SHA}`,
     `match=${shell.rematchNumber}/${H2_TRIAL_GAME_COUNT}`,
     `seed=${trialSeedForMatch(shell.rematchNumber)}`,
-    `firstPlayer=${state.firstPlayerId}`,
+    `firstPlayer=${trialFirstPlayerId(state)}`,
     `endKind=${result.summary.endKind}`,
     `round=${state.roundNumber}`,
     `threshold75=${state.world.triggeredThresholds.includes(75)}`,

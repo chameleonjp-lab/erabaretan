@@ -43,6 +43,19 @@ if (!appElement) throw new Error("#app is required");
 const app = appElement;
 
 const PLAYER_IDS: readonly [PlayerId, PlayerId] = ["P1", "P2"];
+const GAME_URL = "https://chameleonjp-lab.github.io/erabaretan/";
+const LAB_URL = "https://chameleonjp-lab.github.io/chameleonjp_lab/";
+const SUPABASE_URL = "https://mlpnjgezrnhdxsxolyzj.supabase.co";
+const SUPABASE_PUBLISHABLE_KEY = "sb_publishable_drzcy0v97knU6FgjqSgBHw_0A9XPdFM";
+const GAME_SLUG = "erabaretan";
+const PLAYER_NAME_KEY = "erabaretan.player-name";
+const CLIENT_VERSION = "erabaretan-2026-08-31-platform";
+
+interface RankingRow {
+  rank: number;
+  displayName: string;
+  score: number;
+}
 
 interface ShellState {
   screen: ShellScreen;
@@ -81,6 +94,133 @@ function escapeHtml(value: string | number | null | undefined): string {
     .replaceAll(">", "&gt;")
     .replaceAll('"', "&quot;")
     .replaceAll("'", "&#039;");
+}
+
+function cleanPlayerName(value: string): string {
+  return value.replace(/\s+/g, " ").trim().slice(0, 20);
+}
+
+function readPlayerName(): string {
+  try {
+    return cleanPlayerName(localStorage.getItem(PLAYER_NAME_KEY) ?? "");
+  } catch {
+    return "";
+  }
+}
+
+function savePlayerName(value: string): string {
+  const name = cleanPlayerName(value);
+  try {
+    if (name) localStorage.setItem(PLAYER_NAME_KEY, name);
+    else localStorage.removeItem(PLAYER_NAME_KEY);
+  } catch {
+    // The name remains available in the input for this session.
+  }
+  return name;
+}
+
+function apiHeaders(): HeadersInit {
+  return {
+    "Content-Type": "application/json",
+    apikey: SUPABASE_PUBLISHABLE_KEY,
+    Authorization: `Bearer ${SUPABASE_PUBLISHABLE_KEY}`,
+  };
+}
+
+async function callRankingRpc<T>(functionName: string, body: Record<string, unknown>): Promise<T> {
+  const response = await fetch(`${SUPABASE_URL}/rest/v1/rpc/${functionName}`, {
+    method: "POST",
+    headers: apiHeaders(),
+    body: JSON.stringify(body),
+  });
+  if (!response.ok) throw new Error(`ランキング通信に失敗しました (${response.status})`);
+  return (await response.json()) as T;
+}
+
+function normalizeRanking(payload: unknown): RankingRow[] {
+  if (!Array.isArray(payload)) return [];
+  return payload.slice(0, 10).map((row, index) => {
+    const item = row as Record<string, unknown>;
+    return {
+      rank: Number(item.rank) || index + 1,
+      displayName: cleanPlayerName(String(item.display_name ?? item.player_name ?? "プレイヤー")) || "プレイヤー",
+      score: Number(item.score) || 0,
+    };
+  });
+}
+
+async function submitAndLoadRanking(score: number): Promise<RankingRow[]> {
+  await callRankingRpc("submit_score", {
+    p_display_name: readPlayerName(),
+    p_game_slug: GAME_SLUG,
+    p_score: Math.max(0, Math.round(score)),
+    p_client_version: CLIENT_VERSION,
+  });
+  const payload = await callRankingRpc<unknown>("get_best_score_ranking", {
+    p_game_slug: GAME_SLUG,
+    p_limit: 10,
+  });
+  return normalizeRanking(payload);
+}
+
+async function shareOrCopy(text: string): Promise<"shared" | "copied" | "cancelled" | "failed"> {
+  if (typeof navigator !== "undefined" && typeof navigator.share === "function") {
+    try {
+      await navigator.share({ text });
+      return "shared";
+    } catch (error) {
+      if (error instanceof DOMException && error.name === "AbortError") return "cancelled";
+    }
+  }
+  try {
+    if (navigator.clipboard?.writeText) {
+      await navigator.clipboard.writeText(text);
+      return "copied";
+    }
+    const textarea = document.createElement("textarea");
+    textarea.value = text;
+    textarea.style.position = "fixed";
+    textarea.style.opacity = "0";
+    document.body.appendChild(textarea);
+    textarea.select();
+    const copied = document.execCommand("copy");
+    textarea.remove();
+    return copied ? "copied" : "failed";
+  } catch {
+    return "failed";
+  }
+}
+
+function shareStatusText(status: "shared" | "copied" | "cancelled" | "failed"): string {
+  if (status === "shared") return "シェア画面を開きました";
+  if (status === "copied") return "シェア文をコピーしました";
+  if (status === "cancelled") return "シェアをキャンセルしました";
+  return "コピーできませんでした。シェア文を長押ししてコピーしてください";
+}
+
+function shareHomeText(): string {
+  return `【エラバレタン】相手を倒すか、世界を守るか。神の審定に挑戦！\n${GAME_URL}\n#エラバレタン #カメレオンJP`;
+}
+
+function rankingScore(summary: MatchSummary): number {
+  return Math.max(0, ...summary.players.map((player) => player.score ?? 0));
+}
+
+function resultShareText(summary: MatchSummary): string {
+  const scores = summary.players
+    .map((player) => `${playerLabel(player.playerId)} ${scoreText(player.score)}`)
+    .join(" / ");
+  const divineWinner = summary.divineSelection.winnerId
+    ? playerLabel(summary.divineSelection.winnerId)
+    : "選定なし";
+  return [
+    `【エラバレタン】${readPlayerName() || "プレイヤー"}の結果`,
+    `${scores}`,
+    `勝者：${summary.battle.winnerId ? playerLabel(summary.battle.winnerId) : "引き分け"} / 神の選定：${divineWinner}`,
+    `世界損傷と世界再生まで含めて、神の審定を受けました。`,
+    GAME_URL,
+    "#エラバレタン #カメレオンJP",
+  ].join("\n");
 }
 
 function opponentOf(playerId: PlayerId): PlayerId {
@@ -147,6 +287,13 @@ function actionCommand(
 }
 
 function startBattle(): void {
+  if (!readPlayerName()) {
+    shell.screen = "TITLE";
+    shell.notice = "プレイヤー名を入力してから戦闘を開始してください。";
+    render();
+    document.querySelector<HTMLInputElement>("[data-player-name]")?.focus();
+    return;
+  }
   shell.rematchNumber += 1;
   const nextState = createLocalMatch(shell.rematchNumber);
   shell.state = nextState;
@@ -423,12 +570,42 @@ function renderResult(): string {
     <p class="result-explanation">${escapeHtml(summary.endKind === "NORMAL" ? "神の選定は、生存・世界損傷・世界再生・破界責任を合わせた正式評価です。" : "非通常終了のため、神の審定は行われませんでした。")}</p>
     ${renderTurningPoints(resultJudgment.turningPoints)}
     <section class="result-cards result-selection"><article><span class="eyebrow">神の選定者</span><strong>${escapeHtml(divineWinner)}</strong><p class="selection-reason">${escapeHtml(selectionReasonText(summary))}</p></article></section>
+    <section class="platform-card result-platform" data-result-platform>
+      <span class="eyebrow">結果を記録・共有</span>
+      <p class="platform-score-note">ランキング登録スコア：${rankingScore(summary).toLocaleString()}点（2人の評価のうち高い方）</p>
+      <textarea class="share-text" data-result-share-text readonly aria-label="結果のシェア文">${escapeHtml(resultShareText(summary))}</textarea>
+      <button class="primary-button wide" data-result-share>シェアする／コピー</button>
+      <p class="platform-status" data-result-status>ランキングに登録中…</p>
+      <div class="ranking-heading">ONLINE TOP 10</div>
+      <ol class="ranking-list" data-result-ranking><li>読み込み中…</li></ol>
+      <a class="lab-link" href="${LAB_URL}" target="_blank" rel="noreferrer">カメレオンJPの実験場へ</a>
+    </section>
     <button class="primary-button wide" data-rematch>もう一度遊ぶ</button>
   </main>`;
 }
 
 function renderTitle(): string {
-  return `<main class="screen title-screen"><div class="title-mark"><span class="eyebrow">短時間対戦カードゲーム</span><h1>エラバレタン</h1><p>相手を倒すか、世界を守るか。最後に神が戦い方を査定します。</p></div><div class="title-actions"><button class="primary-button wide" data-world-law>世界律を確認する</button><p class="small-note">P3-04 結果要約・転換点 / 2人で交互に操作</p></div></main>`;
+  return `<main class="screen title-screen"><div class="title-mark"><span class="eyebrow">短時間対戦カードゲーム</span><h1>エラバレタン</h1><p>相手を倒すか、世界を守るか。最後に神が戦い方を査定します。</p></div><section class="platform-card title-platform"><label class="name-label" for="erabaretan-player-name">プレイヤー名（必須・ランキング名）</label><input id="erabaretan-player-name" data-player-name maxlength="20" autocomplete="nickname" value="${escapeHtml(readPlayerName())}" placeholder="名前を入力"><p class="platform-status" data-name-status>${escapeHtml(shell.notice || "名前を入力してからゲーム開始")}</p><div class="platform-actions"><button class="secondary-button" data-share-home>ホームをシェア</button><a class="lab-link" href="${LAB_URL}" target="_blank" rel="noreferrer">実験場へ</a></div></section><div class="title-actions"><button class="primary-button wide" data-world-law>世界律を確認する</button><p class="small-note">P3-04 結果要約・転換点 / 2人で交互に操作</p></div></main>`;
+}
+
+function prepareResultPlatform(summary: MatchSummary): void {
+  const panel = app.querySelector<HTMLElement>("[data-result-platform]");
+  const status = panel?.querySelector<HTMLElement>("[data-result-status]");
+  const ranking = panel?.querySelector<HTMLOListElement>("[data-result-ranking]");
+  if (!panel || !status || !ranking) return;
+  void submitAndLoadRanking(rankingScore(summary))
+    .then((rows) => {
+      if (!panel.isConnected) return;
+      ranking.innerHTML = rows.length
+        ? rows.map((row) => `<li><span>${row.rank}. ${escapeHtml(row.displayName)}</span><strong>${row.score.toLocaleString()}点</strong></li>`).join("")
+        : "<li>まだランキングがありません</li>";
+      status.textContent = "オンラインランキングに反映しました";
+    })
+    .catch(() => {
+      if (!panel.isConnected) return;
+      status.textContent = "ランキングは現在利用できません（結果は表示されています）";
+      ranking.innerHTML = "<li>ランキングを読み込めませんでした</li>";
+    });
 }
 
 function renderWorldLaw(): string {
@@ -442,14 +619,46 @@ function renderError(message: string): string {
 function render(): void {
   if (shell.screen === "TITLE") app.innerHTML = renderTitle();
   else if (shell.screen === "WORLD_LAW") app.innerHTML = renderWorldLaw();
-  else if (shell.screen === "RESULT") app.innerHTML = renderResult();
+  else if (shell.screen === "RESULT") {
+    app.innerHTML = renderResult();
+    if (shell.state) {
+      const result = summarizeMatch(shell.state);
+      if (result.ok) prepareResultPlatform(result.summary);
+    }
+  }
   else if (shell.handoffFor) app.innerHTML = renderHandoff(shell.handoffFor);
   else app.innerHTML = renderBattle();
 }
 
+app.addEventListener("input", (event) => {
+  const target = event.target instanceof HTMLInputElement && event.target.dataset.playerName !== undefined
+    ? event.target
+    : null;
+  if (!target) return;
+  const name = savePlayerName(target.value);
+  const status = app.querySelector<HTMLElement>("[data-name-status]");
+  if (status) status.textContent = name ? "名前を保存しました" : "名前を入力してからゲーム開始";
+});
+
 app.addEventListener("click", (event) => {
   const target = event.target instanceof HTMLElement ? event.target.closest<HTMLElement>("button") : null;
   if (!target) return;
+  if (target.dataset.shareHome !== undefined) {
+    const status = app.querySelector<HTMLElement>("[data-name-status]");
+    void shareOrCopy(shareHomeText()).then((result) => {
+      if (status) status.textContent = shareStatusText(result);
+    });
+    return;
+  }
+  if (target.dataset.resultShare !== undefined) {
+    const shareText = app.querySelector<HTMLTextAreaElement>("[data-result-share-text]")?.value;
+    const status = app.querySelector<HTMLElement>("[data-result-status]");
+    if (!shareText) return;
+    void shareOrCopy(shareText).then((result) => {
+      if (status) status.textContent = shareStatusText(result);
+    });
+    return;
+  }
   if (target.dataset.worldLaw !== undefined) {
     shell.screen = "WORLD_LAW";
     shell.notice = "";

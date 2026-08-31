@@ -44,6 +44,23 @@ p { color: var(--muted); line-height: 1.7; }
 .title-actions { margin-top: 48px; }
 .small-note { margin: 12px 0 0; font-size: 0.78rem; text-align: center; }
 .lead { max-width: 38rem; font-size: 1.05rem; }
+.platform-card { margin: 18px 0; padding: 16px; border: 1px solid rgba(231, 182, 107, 0.32); border-radius: 17px; background: var(--panel); box-shadow: 0 16px 48px rgba(0, 0, 0, 0.16); }
+.title-platform { max-width: 620px; }
+.name-label { display: block; color: var(--accent-strong); font-size: 0.8rem; font-weight: 800; }
+.name-label + input { width: 100%; min-height: 46px; margin-top: 8px; border: 1px solid rgba(231, 182, 107, 0.5); border-radius: 11px; padding: 10px 12px; color: var(--ink); background: #111824; }
+.name-label + input::placeholder { color: #788394; }
+.name-label + input:focus { outline: 3px solid rgba(243, 206, 135, 0.35); outline-offset: 2px; }
+.platform-status { min-height: 1.5em; margin: 8px 0; color: var(--muted); font-size: 0.76rem; }
+.platform-actions { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.platform-actions a, .lab-link { display: inline-flex; min-height: 44px; align-items: center; justify-content: center; border: 1px solid var(--line); border-radius: 13px; padding: 10px 12px; color: var(--accent-strong); background: var(--panel-soft); font-size: 0.82rem; font-weight: 800; text-decoration: none; }
+.platform-score-note { margin: 8px 0 10px; color: var(--muted); font-size: 0.78rem; }
+.share-text { display: block; width: 100%; min-height: 122px; margin: 8px 0; resize: vertical; border: 1px solid var(--line); border-radius: 11px; padding: 10px; color: var(--ink); background: #111824; font: inherit; font-size: 0.78rem; line-height: 1.55; user-select: text; -webkit-user-select: text; }
+.ranking-heading { margin-top: 16px; color: var(--accent-strong); font-size: 0.78rem; font-weight: 800; letter-spacing: 0.1em; }
+.ranking-list { display: grid; gap: 5px; margin: 8px 0 14px; padding-left: 24px; }
+.ranking-list li { display: flex; justify-content: space-between; gap: 12px; color: var(--muted); font-size: 0.8rem; }
+.ranking-list strong { color: var(--accent-strong); white-space: nowrap; }
+.result-platform { margin-top: 18px; }
+.result-platform .lab-link { width: 100%; }
 .law-rules { display: grid; gap: 10px; margin: 28px 0; }
 .law-rules div { display: grid; grid-template-columns: 54px 1fr; gap: 12px; align-items: center; padding: 16px; border: 1px solid var(--line); border-radius: 16px; background: var(--panel); }
 .law-rules strong { color: var(--accent-strong); font-size: 1.5rem; }
